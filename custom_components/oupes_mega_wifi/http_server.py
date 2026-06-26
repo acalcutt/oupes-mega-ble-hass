@@ -123,6 +123,7 @@ class OUPESHttpInterceptServer:
         debug_file: Path | None = None,
         debug_http: bool = False,
         tcp_server: object = None,
+        advertised_host: str | None = None,
     ) -> None:
         self._port = int(port)
         self._tcp_port = int(tcp_port)
@@ -131,6 +132,7 @@ class OUPESHttpInterceptServer:
         self._debug_file = debug_file
         self._debug_http = debug_http
         self._tcp_server = tcp_server  # OUPESWiFiProxyServer, for live online status
+        self._advertised_host = advertised_host  # explicit override for Docker/proxy setups
         self._runner: web.AppRunner | None = None
         # token → {email, uid, broker_uid, nickname, mark_token}
         self._sessions: dict[str, dict] = {}
@@ -191,12 +193,15 @@ class OUPESHttpInterceptServer:
     # ------------------------------------------------------------------
 
     def _local_ip(self, request: web.Request) -> str:
-        """Return the local interface IP this request arrived on.
+        """Return the IP to advertise as the broker address.
 
-        When the server listens on 0.0.0.0, the *accepted* socket's
-        sockname reflects the specific interface (e.g. 192.168.1.5),
-        which is what we need to return to the app as broker address.
+        Prefers the explicit advertised_host override (needed when running
+        behind Docker NAT where the socket's local address is the container
+        bridge IP, not the host LAN IP the device can actually reach).
+        Falls back to the accepted socket address when no override is set.
         """
+        if self._advertised_host:
+            return self._advertised_host
         sockname = request.transport.get_extra_info("sockname")  # type: ignore[union-attr]
         if sockname and sockname[0] not in ("0.0.0.0", "::"):
             return sockname[0]

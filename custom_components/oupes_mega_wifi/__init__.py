@@ -22,6 +22,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from urllib.parse import urlparse
+
 from homeassistant.config_entries import ConfigEntry, ConfigEntryChange, SIGNAL_CONFIG_ENTRY_CHANGED
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
@@ -225,6 +227,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.error("OUPES Mega WiFi: could not bind TCP port %d: %s", port, exc)
             return False
 
+        # Resolve the IP to advertise in bind responses.  When HA runs in
+        # Docker bridge mode the accepted socket address is the container's
+        # internal IP, not the host LAN IP that IoT devices can reach.
+        # Pull the hostname from HA's configured internal URL so the device
+        # gets an address it can actually connect to.
+        advertised_host: str | None = None
+        internal_url: str | None = getattr(hass.config, "internal_url", None)
+        if internal_url:
+            parsed = urlparse(internal_url)
+            h = parsed.hostname or ""
+            if h and h not in ("localhost", "127.0.0.1", "::1", "homeassistant.local"):
+                advertised_host = h
+
         http_server = OUPESHttpInterceptServer(
             port=http_port,
             tcp_port=port,
@@ -233,6 +248,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             debug_file=debug_file,
             debug_http=debug_http,
             tcp_server=tcp_server,
+            advertised_host=advertised_host,
         )
         try:
             await http_server.start()
@@ -281,7 +297,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         _pid: str = product_id,
                     ) -> None:
                         # Persist product_id into the subentry.
-                        await hass.config_entries.async_update_subentry(
+                        # async_update_subentry returns bool (not a coroutine).
+                        hass.config_entries.async_update_subentry(
                             _entry,
                             _sub,
                             data={**_sub.data, CONF_PRODUCT_ID: _pid},
