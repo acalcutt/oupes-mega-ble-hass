@@ -276,31 +276,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
                     async def _persist_and_reload(
                         _entry: ConfigEntry = cfg_entry,
-                        _sub_id: str = subentry_id,
                         _sub: Any = sub,
                         _pid: str = product_id,
                     ) -> None:
-                        # Persist product_id into the subentry.
-                        await hass.config_entries.async_update_subentry(
+                        # async_update_subentry is synchronous - returns bool, not a coroutine.
+                        hass.config_entries.async_update_subentry(
                             _entry,
                             _sub,
                             data={**_sub.data, CONF_PRODUCT_ID: _pid},
                         )
-                        # Reload the subentry so entities are recreated with the
-                        # correct model-specific names (entity_description.name is
-                        # baked at registration time; updating coord.product_id
-                        # alone does not re-derive the names).
-                        fresh = _entry.subentries.get(_sub_id)
-                        if fresh is None:
-                            return
+                        # HA 2026.6 has no async_reload_subentry; reload the parent entry so
+                        # entities are recreated with the correct model-specific names.
                         _LOGGER.info(
-                            "OUPES WiFi: product_id for %s changed → %s; reloading subentry",
+                            "OUPES WiFi: product_id for %s changed -> %s; reloading entry",
                             device_id, _pid,
                         )
-                        await hass.config_entries.async_unload_subentry(_entry, fresh)
-                        fresh2 = _entry.subentries.get(_sub_id)
-                        if fresh2:
-                            await hass.config_entries.async_setup_subentry(_entry, fresh2)
+                        await hass.config_entries.async_reload(_entry.entry_id)
 
                     hass.async_create_task(_persist_and_reload())
                     return
