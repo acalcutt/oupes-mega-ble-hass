@@ -636,6 +636,8 @@ class OUPESHttpInterceptServer:
         # this same HTTP server on 8897.  The firmware uses paths WITHOUT
         # the "/app/" prefix and expects SiBo-style {"ret":"1",...} responses
         # (string, not integer).
+        if path == "/api/v2/device/status" and method == "POST":
+            return self._route_sibo_device_status(body, request)
         if path == "/api/device/unbind" and method == "POST":
             return self._route_sibo_device_unbind(body)
         if path == "/api/device/bind" and method == "POST":
@@ -662,6 +664,30 @@ class OUPESHttpInterceptServer:
         since the DoHome firmware parser may use simple string matching.
         """
         return web.Response(content_type="application/json", text=_sibo_json_compact(data))
+
+    def _route_sibo_device_status(self, body: bytes, request: web.Request) -> web.Response:
+        """Handle POST /api/v2/device/status from device firmware.
+
+        The device calls this after losing its TCP broker connection
+        (restart_reason 8).  The real cloud responds with the broker address
+        so the device can reconnect without a full boot cycle.
+        """
+        b = _parse_body(body)
+        device_id = b.get("device_id", "")
+        device_key = b.get("device_key", "")
+        _LOGGER.info(
+            "SiBo device status: device_id=%s restart_reason=%s",
+            device_id, b.get("restart_reason", "?"),
+        )
+        ha_ip = self._local_ip(request)
+        ts = str(int(time.time()))
+        return self._json_sibo(_sibo_ok({
+            "uid":              self._uid_for_device(device_id, device_key),
+            "tcp_ip":           ha_ip,
+            "tcp_port":         self._tcp_port,
+            "timestamp":        ts,
+            "timezone_offset":  0,
+        }))
 
     def _route_sibo_device_unbind(self, body: bytes) -> web.Response:
         """Handle POST /api/device/unbind from device firmware.
