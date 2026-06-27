@@ -1183,49 +1183,56 @@ python debug_info/scan_wifi_ports.py 192.168.1.209 --udp
 
 **Important:** The device must be WiFi-connected when you run the scan. Use
 the HA BLE integration's "Create New Key" config flow (which pairs and
-provisions WiFi automatically), or use `pair_device.py` / `provision_wifi.py`
-manually, then run the scan while the device is connected.
+provisions WiFi automatically), or use `pair_device.py` to pair then
+`ble_confignet.py` to provision WiFi manually, then run the scan while the
+device is connected.
 
 ### Provisioning WiFi via BLE — Working
 
-> **Correction (2026-04-13):** The earlier analysis in this section concluded
-> that CLAIM packets carry random tokens, not WiFi credentials, and that WiFi
-> provisioning via BLE was "not possible". **This was wrong.** The 30-byte
-> field in CLAIM packets 6–8 DOES carry the WiFi SSID + PSK, padded to 30
-> bytes. The confusion arose because the APK's `generateRandomString(30)` is
-> used for a *different* code path (the `openId` binding token); the actual
-> WiFi provisioning path calls `toSendConfigNetData` which encodes real
-> credentials.
+> **Update (2026-06-27):** An earlier revision of this section described WiFi
+> provisioning via CLAIM packets (the `provision_wifi.py` approach). That
+> packet format was an unverified guess. A subsequent WiFi packet capture and
+> APK decompile (Cleanergy v1.4.2, `SingleBleDevice.getBleToDeviceSendConfigNetInfoCmd1`)
+> confirmed that credentials are delivered over BLE using a dedicated
+> **config-net CMD1** command, not embedded in CLAIM packets.
+> `provision_wifi.py` has been replaced by `ble_confignet.py` which implements
+> the verified format.
 
-WiFi provisioning via BLE CLAIM packets is **fully working**. The HA WiFi
-integration (`oupes_mega_wifi`) implements this in its device sub-entry
-flow under the "Generate new device key" option — it collects SSID/PSK and
-passes them to `async_pair_device()` during BLE pairing. The BLE integration
-(`oupes_mega_ble`) does not yet collect WiFi credentials in its config flow,
-though the underlying protocol layer supports it (a future enhancement). The
-standalone script [`provision_wifi.py`](provision_wifi.py) also demonstrates
-the protocol.
+WiFi provisioning via BLE is **fully working** using the config-net CMD1
+command decoded from the Cleanergy APK. The HA WiFi integration
+(`oupes_mega_wifi`) implements this in its device sub-entry flow under the
+"Generate new device key" option. The standalone script
+[`ble_confignet.py`](ble_confignet.py) can be used to provision any device
+manually.
 
-**How it works:**
+**How it works (ble_confignet.py flow):**
 
-1. BLE connect → handshake → init sequence (as documented above)
-2. CLAIM packets 1–5: pairing handshake (device_key exchange)
-3. **CLAIM packet 6:** WiFi SSID (padded to 30 bytes)
-4. **CLAIM packet 7:** WiFi PSK (padded to 30 bytes)
-5. **CLAIM packet 8:** Confirmation / commit
-6. Device disconnects BLE, connects to WiFi, and begins the SiBo bind → broker connect sequence
+1. BLE connect to the device (must be in pairing mode — IoT button flashing)
+2. **Step 1 — bind config-net:** send CMD1 with empty SSID/PSK to establish the device_key binding and openId token
+3. **Step 2 — creds config-net:** send CMD1 with real SSID, PSK, BSSID, and same openId
+4. Wait for CMD12 status response: `0x00` or `0x01` = joined successfully
+5. Device connects to WiFi and begins the SiBo bind → broker connect sequence
 
-Five bugs were fixed in `protocol.py` to make this work:
-- CRC-8 checksum calculation was incorrect
-- Packet framing offsets were wrong
-- SSID/PSK padding was not applied
-- Slot byte was hardcoded incorrectly
-- Packet length field did not account for the full payload
+**Packet format** (from `getBleToDeviceSendConfigNetInfoCmd1`):
+```
+0x01 | len(1B) | ssid(32B) | passwd(64B) | bssid(6B) | deviceKey(10B) | openId(33B) | lat(4B=0) | lng(4B=0)
+```
+Payload is split into 17-byte BLE chunks, each framed as `[0x01][pkgSn][17B data][crc8]`
+with the last packet's `pkgSn` having `0x80` OR'd in.
 
-After successful provisioning, the device reboots its WiFi stack and connects
-to the configured network within ~5–10 seconds. No factory reset or Cleanergy
-app is required — the WiFi proxy integration handles the entire flow during
-device setup.
+**Usage:**
+```bash
+# 1. Pair the device (BLE only, sets device_key)
+uv run --with bleak python pair_device.py 8C:D0:B2:A9:8C:59 --key 39e0219ad0
+
+# 2. Provision WiFi (uses correct APK-decoded format)
+uv run --with bleak python ble_confignet.py 8C:D0:B2:A9:8C:59 \
+    --ssid YourSSID --psk YourPassword --key 39e0219ad0 --bssid AA:BB:CC:DD:EE:FF
+```
+
+After successful provisioning, the device connects to WiFi within ~5-10 seconds.
+Check your router DHCP leases for the new device. No factory reset or Cleanergy
+app is required when using the HA WiFi integration's config flow.
 
 ---
 
