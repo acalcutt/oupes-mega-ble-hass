@@ -111,11 +111,6 @@ The [`debug_info/`](debug_info/) directory contains standalone tools:
 
 ---
 
-## Credits
-
-HACS packaging contributed by [@HeedfulCrayon](https://github.com/HeedfulCrayon)
-(see [#9](https://github.com/acalcutt/oupes-mega-ble-hass/issues/9)).
-
 ## License
 
 See [LICENSE](LICENSE).
