@@ -61,7 +61,7 @@ catalog. Add it as a custom repository:
 
 1. Open **HACS → Integrations**.
 2. Open the three-dot menu and select **Custom repositories**.
-3. Enter `https://github.com/acalcutt/oupes-mega-hass`.
+3. Enter `https://github.com/acalcutt/oupes-mega-ble-hass`.
 4. Select **Integration**, click **Add**, and install **OUPES Mega BLE**.
 5. Restart Home Assistant.
 
@@ -383,7 +383,7 @@ The script replicates the exact BLE pairing protocol the Cleanergy app uses
 (AUTH → handshake polling → CLAIM with key + dummy MQTT token), with no cloud
 or app dependency. Typical pairing completes in one cycle (~18 seconds).
 
-All `debug_info/` paths are relative to the repo root (`oupes-mega-hass/`).
+All `debug_info/` paths are relative to the repo root (`oupes-mega-ble-hass/`).
 
 ### WiFi provisioning
 

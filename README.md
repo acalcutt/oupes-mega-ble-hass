@@ -33,7 +33,7 @@ device over BLE and exposes sensors, switches, and settings entities.
 
 1. Open **HACS → Integrations**.
 2. Open the three-dot menu and select **Custom repositories**.
-3. Enter `https://github.com/acalcutt/oupes-mega-hass`.
+3. Enter `https://github.com/acalcutt/oupes-mega-ble-hass`.
 4. Select **Integration**, click **Add**, and install **OUPES Mega BLE**.
 5. Restart Home Assistant.
 
@@ -114,7 +114,7 @@ The [`debug_info/`](debug_info/) directory contains standalone tools:
 ## Credits
 
 HACS packaging contributed by [@HeedfulCrayon](https://github.com/HeedfulCrayon)
-(see [#9](https://github.com/acalcutt/oupes-mega-hass/issues/9)).
+(see [#9](https://github.com/acalcutt/oupes-mega-ble-hass/issues/9)).
 
 ## License
 
