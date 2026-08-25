@@ -13,7 +13,7 @@ The ``device_id`` is extracted from BLE advertising data during discovery.
 Device matching falls back to MAC address when device_id is unavailable.
 
 **Important:** This API uses unencrypted HTTP (not HTTPS).  This mirrors
-the official Cleanergy app's own behaviour — OUPES does not offer an
+the official Cleanergy app's own behaviour - OUPES does not offer an
 HTTPS endpoint.
 """
 from __future__ import annotations
@@ -121,7 +121,7 @@ async def _fetch_by_device_id(
     device_id: str,
     token: str,
 ) -> str | None:
-    """GET /api/app/device/info?device_id=...&token=... → device_key."""
+    """GET /api/app/device/info?device_id=...&token=... -> device_key."""
     params = {**_COMMON_PARAMS, "device_id": device_id, "token": token}
     try:
         async with session.get(

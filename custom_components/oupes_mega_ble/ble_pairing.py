@@ -1,12 +1,12 @@
-﻿"""BLE pairing for OUPES Mega â€” programs a new device_key over Bluetooth.
+"""BLE pairing for OUPES Mega - programs a new device_key over Bluetooth.
 
 Replicates the exact Cleanergy app pairing protocol (reverse-engineered from
 a bugreport btsnoop HCI capture):
 
-  AUTH (11 pkts) â†’ 0x03 handshake polling â†’ re-AUTH â†’ more polling â†’
-  CLAIM data (10 pkts with key + dummy MQTT token) â†’ wait for confirmation
+    AUTH (11 pkts) -> 0x03 handshake polling -> re-AUTH -> more polling ->
+    CLAIM data (10 pkts with key + dummy MQTT token) -> wait for confirmation
 
-The device must be in pairing mode (5 s IoT button hold â†’ rapid flash).
+The device must be in pairing mode (5 s IoT button hold -> rapid flash).
 """
 from __future__ import annotations
 
@@ -117,7 +117,7 @@ async def async_pair_device(
     for cycle in range(1, max_cycles + 1):
         await _report(f"Cycle {cycle}/{max_cycles}: looking for device...")
 
-        # Use HA's Bluetooth stack to find the device â€” this respects
+        # Use HA's Bluetooth stack to find the device - this respects
         # adapter selection and avoids raw BleakScanner issues.
         ble_device = async_ble_device_from_address(
             hass, address, connectable=True
@@ -151,7 +151,7 @@ async def async_pair_device(
             return result
 
         if cycle < max_cycles:
-            await _report(f"Cycle {cycle} did not confirm â€” retrying...")
+            await _report(f"Cycle {cycle} did not confirm - retrying...")
             await asyncio.sleep(3)
 
     return PairingResult.TIMEOUT

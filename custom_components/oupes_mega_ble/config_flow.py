@@ -1,16 +1,16 @@
 """Config flow for OUPES Mega integration.
 
 Supports two entry points:
-  1. Automatic — HA's bluetooth scanner finds a 'TT' device and calls
+  1. Automatic - HA's bluetooth scanner finds a 'TT' device and calls
      async_step_bluetooth(); the user confirms.
-  2. Manual   — user picks 'Add Integration > OUPES Mega' and types the
+  2. Manual   - user picks 'Add Integration > OUPES Mega' and types the
      Bluetooth MAC address.
 
 After identifying the device, both paths present a method-selection step
 with three options for providing the device_key:
-  A. Create new key  — factory-reset the device and pair over BLE
-  B. Existing key    — enter a known key manually
-  C. Cloud login     — fetch the key from the Cleanergy cloud
+  A. Create new key  - factory-reset the device and pair over BLE
+  B. Existing key    - enter a known key manually
+  C. Cloud login     - fetch the key from the Cleanergy cloud
 """
 from __future__ import annotations
 
@@ -155,7 +155,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._reconfigure_task: asyncio.Task | None = None
         self._reconfigure_new_data: dict[str, Any] = {}
 
-    # ── Automatic bluetooth discovery ─────────────────────────────────────
+    # -- Automatic bluetooth discovery ------------------------------------
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfo
@@ -193,7 +193,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
-    # ── Manual setup ──────────────────────────────────────────────────────
+    # -- Manual setup ------------------------------------------------------
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -237,7 +237,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    # ── Method selection ──────────────────────────────────────────────────
+    # -- Method selection --------------------------------------------------
 
     async def async_step_choose_method(
         self, user_input: dict[str, Any] | None = None
@@ -271,7 +271,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
-    # ── Method A: Create new key via BLE pairing ─────────────────────────
+    # -- Method A: Create new key via BLE pairing -------------------------
 
     async def async_step_create_key(
         self, user_input: dict[str, Any] | None = None
@@ -378,10 +378,10 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_pairing_complete(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Pairing succeeded — proceed to connection settings."""
+        """Pairing succeeded - proceed to connection settings."""
         return await self.async_step_connection_settings()
 
-    # ── Method B: Enter existing key ─────────────────────────────────────
+    # -- Method B: Enter existing key -------------------------------------
 
     async def async_step_existing_key(
         self, user_input: dict[str, Any] | None = None
@@ -414,7 +414,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    # ── Method C: Cloud login ────────────────────────────────────────────
+    # -- Method C: Cloud login --------------------------------------------
 
     async def async_step_cloud_login(
         self, user_input: dict[str, Any] | None = None
@@ -460,7 +460,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-    # ── Connection settings (final step before entry creation) ──────────
+    # -- Connection settings (final step before entry creation) ----------
 
     async def async_step_connection_settings(
         self, user_input: dict[str, Any] | None = None
@@ -537,7 +537,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
-    # ── Reconfigure / re-pair an existing entry ─────────────────────────────
+    # -- Reconfigure / re-pair an existing entry -----------------------------
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
@@ -646,13 +646,13 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "device_key": self._pairing_key,
             }
             if self._reconfigure_repair:
-                # Full claim sequence — device must be in pairing mode.
+                # Full claim sequence - device must be in pairing mode.
                 if self._wifi_ssid:
                     kwargs["ssid"] = self._wifi_ssid
                     kwargs["psk"] = self._wifi_psk
                 coro = async_pair_device(**kwargs)
             else:
-                # Soft re-provision — no factory reset, just new credentials.
+                # Soft re-provision - no factory reset, just new credentials.
                 kwargs["ssid"] = self._wifi_ssid
                 kwargs["psk"] = self._wifi_psk
                 coro = async_provision_wifi(**kwargs)
@@ -701,7 +701,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data = self._reconfigure_new_data or dict(entry.data)
 
         # The device key may also live in options, where it takes priority
-        # over entry.data — keep the two in sync so the new key is used.
+        # over entry.data - keep the two in sync so the new key is used.
         options = dict(entry.options)
         if CONF_DEVICE_KEY in options:
             options[CONF_DEVICE_KEY] = data[CONF_DEVICE_KEY]
@@ -716,7 +716,7 @@ class OUPESMegaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+# -- Helper -------------------------------------------------------------------
 
 async def _cloud_fetch_key(
     hass,
@@ -741,10 +741,10 @@ async def _cloud_fetch_key(
         return None
 
 
-# ── Options flow (unchanged) ──────────────────────────────────────────────────
+# -- Options flow (unchanged) -------------------------------------------------
 
 class OUPESMegaOptionsFlow(config_entries.OptionsFlow):
-    """Options flow — lets the user toggle continuous BLE connection mode."""
+    """Options flow - lets the user toggle continuous BLE connection mode."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._entry = config_entry

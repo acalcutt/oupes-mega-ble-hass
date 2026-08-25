@@ -1,4 +1,4 @@
-"""analyze_attr_csv.py — Analyze the attrs CSV produced by the OUPES Mega HA plugin.
+"""analyze_attr_csv.py - Analyze the attrs CSV produced by the OUPES Mega HA plugin.
 
 Usage:
     python analyze_attr_csv.py                          # auto-find CSV in same folder
@@ -9,12 +9,12 @@ is enabled in the integration options.  Each row is one attr observation:
   timestamp, attr, attr_hex, value, known, slot, soc, grid_w, note
 
 Sections produced:
-  1 — Unknown attrs (never seen in our protocol map)
-  2 — Attr-78 deep-dive (mystery / voltage / runtime by slot)
-  3 — Full value-range summary for every attr
-  4 — Low-SoC regime (SoC ≤ 5%) — new or changed values vs normal
-  5 — Grid-correlated attrs (non-zero on grid, zero off grid)
-  6 — Attr-78 mystery values in detail (if any)
+  1 - Unknown attrs (never seen in our protocol map)
+  2 - Attr-78 deep-dive (mystery / voltage / runtime by slot)
+  3 - Full value-range summary for every attr
+  4 - Low-SoC regime (SoC <= 5%) - new or changed values vs normal
+  5 - Grid-correlated attrs (non-zero on grid, zero off grid)
+  6 - Attr-78 mystery values in detail (if any)
 """
 
 import csv
@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# ── Known attr names (mirrors protocol.py) ────────────────────────────────────
+# -- Known attr names (mirrors protocol.py) -----------------------------------
 ATTR_NAMES: dict[int, str] = {
     1:   "AC Output (bool)",
     2:   "DC Output (bool)",
@@ -59,7 +59,7 @@ ATTR78_MV_MAX      = 58500
 LOW_SOC_THRESHOLD  = 5
 
 
-# ── Data structures ───────────────────────────────────────────────────────────
+# -- Data structures ----------------------------------------------------------
 
 class Row:
     __slots__ = ("ts", "attr", "value", "known", "slot", "soc", "grid_w", "note")
@@ -96,7 +96,7 @@ def find_csv() -> Path:
     return candidates[-1]
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers ------------------------------------------------------------------
 
 def fmt_range(vals: list[int], n: int = 20) -> str:
     if not vals:
@@ -113,7 +113,7 @@ def attr_label(attr: int) -> str:
     return f"Attr {attr:3d} (0x{attr:02x})  [{name}]"
 
 
-# ── Sections ──────────────────────────────────────────────────────────────────
+# -- Sections -----------------------------------------------------------------
 
 def section_unknown_attrs(rows: list[Row]) -> None:
     print("=" * 70)
@@ -346,7 +346,7 @@ def section_mystery_detail(rows: list[Row]) -> None:
         print("    Not enough SoC-tagged mystery rows yet.")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ---------------------------------------------------------------------
 
 def main() -> None:
     if len(sys.argv) > 1:

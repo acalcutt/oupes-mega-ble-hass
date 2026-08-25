@@ -1,5 +1,5 @@
 """
-scan_ble.py — Scan for OUPES Mega 1 "TT" BLE devices and display live telemetry.
+scan_ble.py - Scan for OUPES Mega 1 "TT" BLE devices and display live telemetry.
 
 Usage:
     python scan_ble.py --key <your_10_hex_char_device_key>
@@ -11,7 +11,7 @@ Key BLE facts (from HCI snoop capture):
   Service:          00001910-0000-1000-8000-00805f9b34fb
   Write char:       00002b11  (handle 0x0003)  write-without-response
   Notify char:      00002b10  (handle 0x0005)  notify
-  CCCD descriptor:  handle 0x0006  → write 0x0100 to enable notifications
+  CCCD descriptor:  handle 0x0006  -> write 0x0100 to enable notifications
 
   The device pushes telemetry automatically upon connection (~350ms in).
   Explicitly writing CCCD 0x0100 to handle 0x0006 is required on Windows
@@ -31,7 +31,7 @@ from bleak.exc import BleakError
 SERVICE_UUID = "00001910-0000-1000-8000-00805f9b34fb"
 CHAR_UUID    = "00002b10-0000-1000-8000-00805f9b34fb"
 
-# Attribute map — numbers match both BLE and WiFi/cloud protocol
+# Attribute map - numbers match both BLE and WiFi/cloud protocol
 ATTR_MAP = {
     1:   ("Output Enable Bitmask",       "raw"),   # bit0=AC, bit1=DC12V, bit2=USB
     2:   ("Unknown (attr 2)",           "raw"),   # possibly legacy output flag; always 0
@@ -46,14 +46,14 @@ ATTR_MAP = {
     22:  ("Grid Input Power",            "W"),
     23:  ("Solar Input Power",           "W"),    # MPPT; 1 = noise floor with nothing connected
     30:  ("Remaining Runtime",          "min"),
-    32:  ("Main Unit Temperature",       "F/10"), # ÷10 = °F (e.g. 963 → 96.3 °F)
+    32:  ("Main Unit Temperature",       "F/10"), # /10 = deg F (e.g. 963 -> 96.3 deg F)
     51:  ("Ext Battery Count",           "raw"),  # number of B2 expansion batteries connected
     53:  ("B2 Input Power",             "W"),    # B2 secondary port (solar/DC in)
     54:  ("B2 Output Power",            "W"),    # B2 total output (chain + USB/accessories)
     84:  ("AC Output Control",          "bool"),
     105: ("AC Inverter Protection",    "bool"),  # 1 = inverter protection/thermal warning (~60s delayed after hardware trip)
                                                    #   AC output suppressed for 8-10 min recovery; fans may struggle; also 1 at elevated temp during run
-                                                   # 0 = normal; attr 32 rises 949→970 correlated with thermal events
+                                                   # 0 = normal; attr 32 rises 949->970 correlated with thermal events
 }
 
 # Attrs that belong to a specific external battery slot.
@@ -99,9 +99,9 @@ def parse_ble_packet(data: bytearray) -> dict[int, int]:
     """Parse a BLE notification packet into {attr: raw_value}.
 
     Handles two formats observed in HCI capture:
-      Type 0x00 / 0x01 / 0x81 / 0x82 — standard TLV stream:
+      Type 0x00 / 0x01 / 0x81 / 0x82 - standard TLV stream:
         [0x01][type][0x0A][len][attr][value bytes...][checksum]
-      Type 0x80 — single-value response packet (different layout):
+      Type 0x80 - single-value response packet (different layout):
         [0x01][0x80][subtype][...raw fields...]
         Not TLV-encoded; logged as raw for now.
     """
@@ -111,7 +111,7 @@ def parse_ble_packet(data: bytearray) -> dict[int, int]:
 
     pkt_type = data[1]
 
-    # 0x80 / 0x81 — not standard TLV; try to extract field at fixed offsets
+    # 0x80 / 0x81 - not standard TLV; try to extract field at fixed offsets
     if pkt_type in (0x80, 0x81):
         # Try treating bytes 2+ as TLV anyway (some 0x81 packets do carry TLV)
         i = 2
@@ -127,11 +127,11 @@ def parse_ble_packet(data: bytearray) -> dict[int, int]:
                 i += 1
         return results
 
-    # 0x82 — end-of-group marker, all zeros body; skip
+    # 0x82 - end-of-group marker, all zeros body; skip
     if pkt_type == 0x82:
         return results
 
-    # 0x00 / 0x01 — standard TLV packets
+    # 0x00 / 0x01 - standard TLV packets
     i = 2  # skip 2-byte header (start marker + type)
     while i < len(data) - 1:  # last byte is checksum
         if data[i] == 0x0A and i + 2 < len(data):
@@ -211,12 +211,12 @@ class DeviceState:
         print()
 
 
-# Known ATT handles (from HCI snoop capture — no GATT discovery needed)
+# Known ATT handles (from HCI snoop capture - no GATT discovery needed)
 HANDLE_WRITE = 0x0003  # 00002b11 write-without-response
 HANDLE_NOTIF = 0x0005  # 00002b10 notify
 HANDLE_CCCD  = 0x0006  # CCCD descriptor for notify char
 
-# Keepalive packet — sent every 10 s after init to prevent session timeout.
+# Keepalive packet - sent every 10 s after init to prevent session timeout.
 # The device disconnects ~10 s after the last keepalive if none is received.
 # First keepalive is sent ~6 s after init (matching the Cleanergy app timing).
 # The device echoes the packet back as an ACK.
@@ -239,7 +239,7 @@ def _crc8(data: bytes) -> int:
 
 def build_init_sequence(device_key: str) -> list[bytes]:
     """Build the 11-packet init sequence with the given 10-char hex device key."""
-    # Base packets — packet 6 will have the key injected
+    # Base packets - packet 6 will have the key injected
     base = [
         bytearray.fromhex("0100019901010101010101010101010101010100"),
         bytearray.fromhex("0101010101010101010101010101010101010100"),
@@ -273,7 +273,7 @@ async def _connect_and_collect(
 ) -> tuple[bool, bool]:
     """
     Single connection attempt.  Returns (dropped_quickly, got_data).
-    dropped_quickly = device dropped in <2 s with no data (cold-probe drop — retry).
+    dropped_quickly = device dropped in <2 s with no data (cold-probe drop - retry).
     got_data        = at least one parsed TLV packet was received.
     """
     import time as _time
@@ -292,7 +292,7 @@ async def _connect_and_collect(
                                disconnected_callback=on_disconnect) as client:
             print("  Connected.")
 
-            # ── Step 1: wait ~1.8 s to match Android GATT-discovery timing ───
+            # -- Step 1: wait ~1.8 s to match Android GATT-discovery timing ---
             # Android spends ~1.8 s on GATT service discovery before writing
             # CCCD.  If we write CCCD immediately the device behaves differently.
             await asyncio.sleep(1.8)
@@ -300,7 +300,7 @@ async def _connect_and_collect(
                 uptime = _time.monotonic() - connect_ts
                 return (uptime < 2.0 and not got_data), got_data
 
-            # ── Step 2: subscribe (writes CCCD 0x0100) ────────────────────────
+            # -- Step 2: subscribe (writes CCCD 0x0100) -----------------------
             def _handler(sender, data: bytearray) -> None:
                 nonlocal got_data
                 pkt_type = data[1] if len(data) > 1 else 0
@@ -318,7 +318,7 @@ async def _connect_and_collect(
             await client.start_notify(CHAR_UUID, _handler)
             print(f"  Subscribed to {CHAR_UUID}")
 
-            # ── Step 3: send init sequence (~200 ms after CCCD, per capture) ──
+            # -- Step 3: send init sequence (~200 ms after CCCD, per capture) -
             await asyncio.sleep(0.2)
             if disconnected_event.is_set():
                 return True, got_data
@@ -333,7 +333,7 @@ async def _connect_and_collect(
                 except BleakError as exc:
                     print(f"  Init packet {i} failed: {exc}")
 
-            # ── Step 4: keepalive loop + collect notifications ────────────────
+            # -- Step 4: keepalive loop + collect notifications ---------------
             # After init the device requires a keepalive every 10 s or it drops
             # the connection.  The first keepalive is sent ~6 s after init
             # (matching Cleanergy app timing from HCI capture).
@@ -383,13 +383,13 @@ async def monitor_device(device, duration: float = 20.0, device_key: str = "") -
     """Connect to a single TT device, collect notifications for `duration` seconds.
 
     The OUPES Mega 1 sometimes makes a "cold probe" connection that drops in
-    <400 ms with no data (BLE reason 0x3e).  This is normal — just retry.
+    <400 ms with no data (BLE reason 0x3e).  This is normal - just retry.
     Once a real session is established:
-      • CCCD is written at ~1.8 s (after GATT discovery delay)
-      • Init sequence is sent ~200 ms later
-      • Device responds with 3× 0x80 handshake ACK packets
-      • Telemetry (TLV) packets stream continuously
-      • A keepalive must be sent every 10 s or the device drops the connection
+      - CCCD is written at ~1.8 s (after GATT discovery delay)
+      - Init sequence is sent ~200 ms later
+      - Device responds with 3x 0x80 handshake ACK packets
+      - Telemetry (TLV) packets stream continuously
+      - A keepalive must be sent every 10 s or the device drops the connection
     """
     state = DeviceState(device.address, device.name or "TT")
     write_char = CHAR_UUID.replace("2b10", "2b11")
@@ -429,7 +429,7 @@ async def main() -> None:
 
     print("Scanning for 'TT' BLE devices (10 s) ...")
     scan_results: dict = await BleakScanner.discover(timeout=10.0, return_adv=True)
-    # return_adv=True → {address: (BLEDevice, AdvertisementData)}
+    # return_adv=True -> {address: (BLEDevice, AdvertisementData)}
     tt_devices = [
         (dev, adv)
         for dev, adv in scan_results.values()
@@ -444,7 +444,7 @@ async def main() -> None:
     for dev, adv in tt_devices:
         print(f"  {dev.name}  [{dev.address}]  RSSI: {adv.rssi} dBm")
 
-    # Connect to all devices concurrently — each runs its own 20 s session in
+    # Connect to all devices concurrently - each runs its own 20 s session in
     # parallel so total wall-clock time stays ~20 s regardless of device count.
     states: list[DeviceState] = await asyncio.gather(
         *(monitor_device(dev, duration=20.0, device_key=device_key) for dev, _ in tt_devices)

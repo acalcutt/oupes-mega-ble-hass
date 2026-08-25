@@ -1,14 +1,14 @@
 """
-parse_btsnoop.py — Parse a btsnoop HCI log and extract ATT packets
+parse_btsnoop.py - Parse a btsnoop HCI log and extract ATT packets
                    to/from the TT device (OUPES Mega 1).
 
 Usage:
     python parse_btsnoop.py C:\\Users\\Andrew\\Downloads\\btsnoop.log
 
 Looks for:
-  - ATT Write Command / Write Request       (opcode 0x52 / 0x12) → what the app SENDS
-  - ATT Handle Value Notification           (opcode 0x1b)         → what the device SENDS
-  - L2CAP Connection events (to map conn handles → MAC addresses)
+  - ATT Write Command / Write Request       (opcode 0x52 / 0x12) -> what the app SENDS
+  - ATT Handle Value Notification           (opcode 0x1b)         -> what the device SENDS
+  - L2CAP Connection events (to map conn handles -> MAC addresses)
 """
 
 import struct
@@ -67,7 +67,7 @@ TARGET_MAC = "8C:D0:B2:A7:EC:AF"
 
 
 def mac_from_bytes(b: bytes) -> str:
-    """Little-endian 6 bytes → colon-separated MAC (uppercase)."""
+    """Little-endian 6 bytes -> colon-separated MAC (uppercase)."""
     return ":".join(f"{x:02X}" for x in reversed(b))
 
 
@@ -86,9 +86,9 @@ def parse_btsnoop(path: str):
 
     pos = 16  # skip 16-byte file header
 
-    # conn_handle → MAC address map
+    # conn_handle -> MAC address map
     handle_to_mac: dict[int, str] = {}
-    # conn_handle → connection index (for labelling)
+    # conn_handle -> connection index (for labelling)
     handle_to_idx: dict[int, int] = {}
     conn_idx = 0
 
@@ -112,7 +112,7 @@ def parse_btsnoop(path: str):
         is_cmd_evt = bool(flags & 2)
 
         # Convert timestamp (microseconds since 00:00:00.000 Jan 1, 0000)
-        # btsnoop epoch is midnight Jan 1, 0000 — offset from Unix epoch:
+        # btsnoop epoch is midnight Jan 1, 0000 - offset from Unix epoch:
         BTSNOOP_EPOCH_OFFSET_US = 0x00dcddb30f2f8000  # microseconds from year 0 to 1970
         unix_us = ts_us - BTSNOOP_EPOCH_OFFSET_US
         try:
@@ -126,7 +126,7 @@ def parse_btsnoop(path: str):
 
         hci_type = pkt[0]
 
-        # ── HCI Events: track LE connection/disconnection ──────────────────────
+        # -- HCI Events: track LE connection/disconnection ---------------------
         if hci_type == HCI_EVENT and len(pkt) >= 3:
             evt_code = pkt[1]
             # LE Meta event
@@ -157,7 +157,7 @@ def parse_btsnoop(path: str):
                 print(f"[{ts_str}] Disconnected  handle=0x{handle:04x}  peer={mac}  reason=0x{reason:02x}")
                 handle_to_mac.pop(handle, None)
 
-        # ── HCI ACL: extract L2CAP/ATT payload ────────────────────────────────
+        # -- HCI ACL: extract L2CAP/ATT payload -------------------------------
         if hci_type == HCI_ACL and len(pkt) >= 5:
             handle_flags = struct.unpack_from("<H", pkt, 1)[0]
             conn_handle  = handle_flags & 0x0FFF

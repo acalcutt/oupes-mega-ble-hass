@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-probe_key.py — Try candidate keys against an OUPES Mega to find the stored one.
+probe_key.py - Try candidate keys against an OUPES Mega to find the stored one.
 
 Tries each candidate key with the 0x01 AUTH sequence and reports which one
 gets a notification response from the device.

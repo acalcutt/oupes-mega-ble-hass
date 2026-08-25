@@ -38,7 +38,7 @@ from .protocol import (
     WRITE_CHAR_UUID,
     parse_ble_packet,
     parse_packet_sequence,
-    build_output_command,  # noqa: F401 – re-exported for switch.py
+    build_output_command,  # noqa: F401 - re-exported for switch.py
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,12 +51,12 @@ OUPESData = dict
 class OUPESMegaCoordinator(DataUpdateCoordinator):
     """Polls one OUPES Mega device via BLE on a fixed interval.
 
-    Each poll: connect → 1.8s GATT delay → subscribe → init sequence →
-    collect notifications for SCAN_DURATION seconds (with keepalives) →
-    disconnect → store data.
+    Each poll: connect -> 1.8s GATT delay -> subscribe -> init sequence ->
+    collect notifications for SCAN_DURATION seconds (with keepalives) ->
+    disconnect -> store data.
 
     Cold-probe drops (device disconnects in <2 s with no data) are retried
-    up to MAX_ATTEMPTS times — this matches normal Cleanergy app behaviour.
+    up to MAX_ATTEMPTS times - this matches normal Cleanergy app behaviour.
     """
 
     # Attrs recognised by the protocol (used to detect unknown attrs in debug mode)
@@ -219,7 +219,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
                 except OSError as exc:
                     _LOGGER.debug("OUPES attr CSV write error: %s", exc)
 
-    # ── Public coordinator interface ──────────────────────────────────────────
+    # -- Public coordinator interface -----------------------------------------
 
     async def _async_update_data(self) -> OUPESData:
         """Called by the coordinator on each update interval."""
@@ -292,7 +292,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
         """
         self._pending_command = command
 
-    # ── Continuous connection management ──────────────────────────────────────
+    # -- Continuous connection management -------------------------------------
 
     def start_continuous_connection(self) -> None:
         """Start the persistent BLE connection background task."""
@@ -311,7 +311,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
         self._continuous_task = None
 
     async def _run_continuous_connection(self) -> None:
-        """Loop: connect → run indefinitely → reconnect after disconnect/error."""
+        """Loop: connect -> run indefinitely -> reconnect after disconnect/error."""
         _RECONNECT_DELAY = 30
         while True:
             try:
@@ -463,7 +463,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
                         self.address, exc,
                     )
 
-            # ── Send settings query (Cmd2) to read current setting values ──
+            # -- Send settings query (Cmd2) to read current setting values --
             for qpkt in self._settings_query_pkts:
                 if disconnected_event.is_set():
                     break
@@ -480,7 +480,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
                     )
                     break
 
-            # Keepalive + data-push loop — runs until disconnected or cancelled
+            # Keepalive + data-push loop - runs until disconnected or cancelled
             await asyncio.sleep(KEEPALIVE_FIRST_DELAY)
             while not disconnected_event.is_set():
                 if attrs or any(ext_batteries.values()):
@@ -532,16 +532,16 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
             except Exception:  # noqa: BLE001
                 pass
 
-    # ── Internal BLE connection logic ─────────────────────────────────────────
+    # -- Internal BLE connection logic ----------------------------------------
 
     async def _connect_once(self, ble_device) -> tuple[bool, OUPESData]:
         """Single BLE connection attempt.
 
         Returns:
             (dropped_quickly, data)
-            dropped_quickly — True if device disconnected in <2 s with no data
+            dropped_quickly - True if device disconnected in <2 s with no data
                               (caller should retry); False otherwise.
-            data            — dict with keys 'attrs' and 'ext_batteries'.
+            data            - dict with keys 'attrs' and 'ext_batteries'.
         """
         # Pre-seed attrs that the firmware only sends sporadically so their
         # entities hold a stable value instead of oscillating to Unknown.
@@ -645,19 +645,19 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"BLE connection failed for {self.address}: {exc}") from exc
 
         try:
-            # ── Step 1: wait for GATT discovery (match Android timing) ───
+            # -- Step 1: wait for GATT discovery (match Android timing) ---
             await asyncio.sleep(1.8)
             if disconnected_event.is_set():
                 uptime = _time.monotonic() - connect_ts
                 return (uptime < 2.0 and not got_data), data
 
-            # ── Step 2: subscribe to notifications ───────────────────────
+            # -- Step 2: subscribe to notifications -----------------------
             await client.start_notify(NOTIFY_CHAR_UUID, notification_handler)
             await asyncio.sleep(0.2)
             if disconnected_event.is_set():
                 return True, data
 
-            # ── Step 3: send 11-packet init sequence ─────────────────────
+            # -- Step 3: send 11-packet init sequence ---------------------
             for i, pkt in enumerate(self._init_sequence):
                 if disconnected_event.is_set():
                     uptime = _time.monotonic() - connect_ts
@@ -672,7 +672,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
                         "Init packet %d error on %s: %s", i, self.address, exc
                     )
 
-            # ── Step 3b: send any queued command ─────────────────────────
+            # -- Step 3b: send any queued command -------------------------
             if self._pending_command is not None:
                 cmd = self._pending_command
                 self._pending_command = None
@@ -688,7 +688,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
                         self.address, exc,
                     )
 
-            # ── Step 3c: send settings query (Cmd2) ─────────────────────
+            # -- Step 3c: send settings query (Cmd2) ---------------------
             for qpkt in self._settings_query_pkts:
                 if disconnected_event.is_set():
                     break
@@ -704,7 +704,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
                     )
                     break
 
-            # ── Step 4: keepalive loop + collect notifications ────────────
+            # -- Step 4: keepalive loop + collect notifications ------------
             async def keepalive_loop() -> None:
                 await asyncio.sleep(KEEPALIVE_FIRST_DELAY)
                 while not disconnected_event.is_set():
@@ -722,7 +722,7 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
                     disconnected_event.wait(), timeout=SCAN_DURATION
                 )
             except asyncio.TimeoutError:
-                pass  # normal — full duration elapsed
+                pass  # normal - full duration elapsed
             finally:
                 keepalive_task.cancel()
                 try:

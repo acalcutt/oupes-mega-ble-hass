@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ble_diag.py — Diagnose BLE characteristics and notification support for OUPES Mega.
+ble_diag.py - Diagnose BLE characteristics and notification support for OUPES Mega.
 Run this BEFORE set_device_key.py to verify the write/notify UUIDs are accessible.
 """
 import asyncio

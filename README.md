@@ -23,6 +23,10 @@ device over BLE and exposes sensors, switches, and settings entities.
 
 **[Full documentation →](custom_components/oupes_mega_ble/README.md)**
 
+The BLE integration can be installed through HACS as a custom repository. Add
+`https://github.com/HeedfulCrayon/oupes-mega-ble-hass` in **HACS → Integrations
+→ Custom repositories**, select **Integration**, and install **OUPES Mega BLE**.
+
 ### 2. WiFi (`oupes_mega_wifi`)
 
 **Merged WiFi integration** — intercepts the device's outbound connection to the
@@ -67,7 +71,8 @@ communication channels and create separate device/entity sets.
 
 ## Quick Start (BLE)
 
-1. Copy `custom_components/oupes_mega_ble/` into your HA config directory.
+1. Install **OUPES Mega BLE** through HACS, or copy
+	`custom_components/oupes_mega_ble/` into your HA config directory.
 2. Restart Home Assistant.
 3. Power on the OUPES device and press the IoT button (indicator flashes).
 4. HA auto-discovers the device — click the notification to set up.
