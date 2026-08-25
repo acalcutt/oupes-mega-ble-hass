@@ -1,9 +1,9 @@
 """Switch entities for the OUPES power station.
 
 Two kinds of switch live here:
-  1. **Output switches** — toggle physical outputs (AC, DC 12V, USB) via the
+  1. **Output switches** - toggle physical outputs (AC, DC 12V, USB) via the
      attr-1 bitmask and ``build_output_command()``.
-  2. **Setting switches** — toggle boolean device settings (ECO mode, silent,
+  2. **Setting switches** - toggle boolean device settings (ECO mode, silent,
      breath light) via individual DPIDs and ``build_setting_command()``.
 """
 from __future__ import annotations
@@ -102,7 +102,7 @@ class OUPESMegaSwitch(CoordinatorEntity[OUPESMegaCoordinator], SwitchEntity):
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_device_info = _device_info(coordinator)
 
-    # ── Availability ──────────────────────────────────────────────────────────
+    # -- Availability ---------------------------------------------------------
 
     @property
     def available(self) -> bool:
@@ -111,7 +111,7 @@ class OUPESMegaSwitch(CoordinatorEntity[OUPESMegaCoordinator], SwitchEntity):
             return False
         return datetime.now() - last <= self.coordinator.stale_timeout
 
-    # ── State ─────────────────────────────────────────────────────────────────
+    # -- State ----------------------------------------------------------------
 
     @property
     def is_on(self) -> bool | None:
@@ -122,7 +122,7 @@ class OUPESMegaSwitch(CoordinatorEntity[OUPESMegaCoordinator], SwitchEntity):
             return None
         return bool(raw & self.entity_description.bit)
 
-    # ── Control ───────────────────────────────────────────────────────────────
+    # -- Control --------------------------------------------------------------
 
     def _current_bitmask(self) -> int:
         if self.coordinator.data is None:
@@ -139,7 +139,7 @@ class OUPESMegaSwitch(CoordinatorEntity[OUPESMegaCoordinator], SwitchEntity):
 
     def _apply_and_send(self, new_bitmask: int) -> None:
         """Apply optimistic state update and queue the BLE write command."""
-        # Optimistic update — makes the UI feel instant.
+        # Optimistic update - makes the UI feel instant.
         if self.coordinator.data is not None:
             self.coordinator.data["attrs"][_ATTR_OUTPUT_BITMASK] = new_bitmask & 0xFF
         self.async_write_ha_state()
@@ -149,7 +149,7 @@ class OUPESMegaSwitch(CoordinatorEntity[OUPESMegaCoordinator], SwitchEntity):
         self.hass.async_create_task(self.coordinator.async_request_refresh())
 
 
-# ── Setting switches (Cmd3 DPID boolean toggles) ─────────────────────────────
+# -- Setting switches (Cmd3 DPID boolean toggles) -----------------------------
 
 @dataclass(frozen=True, kw_only=True)
 class OUPESSettingSwitchDescription(SwitchEntityDescription):

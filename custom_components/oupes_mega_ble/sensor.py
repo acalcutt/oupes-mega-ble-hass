@@ -40,7 +40,7 @@ def _device_info(coordinator: OUPESMegaCoordinator) -> DeviceInfo:
     )
 
 
-# ── Entity description ────────────────────────────────────────────────────────
+# -- Entity description -------------------------------------------------------
 
 @dataclass(frozen=True, kw_only=True)
 class OUPESSensorDescription(SensorEntityDescription):
@@ -48,7 +48,7 @@ class OUPESSensorDescription(SensorEntityDescription):
 
     # BLE attribute number for this sensor
     attr: int = 0
-    # None → main device; 1 or 2 → external battery slot
+    # None -> main device; 1 or 2 -> external battery slot
     slot: int | None = None
     # Optional transform from raw integer to the value exposed to HA
     value_fn: Callable[[int], float | str] | None = None
@@ -57,7 +57,7 @@ class OUPESSensorDescription(SensorEntityDescription):
     data_key: str | int | None = None
 
 
-# ── Main device sensors ───────────────────────────────────────────────────────
+# -- Main device sensors ------------------------------------------------------
 
 SENSOR_DESCRIPTIONS: tuple[OUPESSensorDescription, ...] = (
     OUPESSensorDescription(
@@ -160,8 +160,8 @@ SENSOR_DESCRIPTIONS: tuple[OUPESSensorDescription, ...] = (
     ),
 )
 
-# ── Per-series display names for attr-6 (car port power) ────────────────────
-# Mirrors the naming used by the car port output switch — same port, same label.
+# -- Per-series display names for attr-6 (car port power) --------------------
+# Mirrors the naming used by the car port output switch - same port, same label.
 _CAR_PORT_POWER_NAMES: dict[str, str] = {
     "mega_1":   "Car Port Power",
     "mega":     "Car & 12V Power",
@@ -169,7 +169,7 @@ _CAR_PORT_POWER_NAMES: dict[str, str] = {
 }
 
 
-# ── Battery module sensors (created dynamically per slot) ────────────────────
+# -- Battery module sensors (created dynamically per slot) --------------------
 # Attr 101 carries the slot index; attrs 78/79/80/53/54 carry the per-slot
 # values. Entities are added the first time each slot number appears in
 # coordinator data, so only the slots that actually exist on this unit are
@@ -189,7 +189,7 @@ def _slot_descriptions(slot: int) -> list[OUPESSensorDescription]:
             device_class=SensorDeviceClass.BATTERY,
             state_class=SensorStateClass.MEASUREMENT,
             native_unit_of_measurement=PERCENTAGE,
-            # Raw value is direct battery % (0–100).
+            # Raw value is direct battery % (0-100).
             # Confirmed: raw 15 = 15% after a few hours of charging.
         ),
         OUPESSensorDescription(
@@ -224,7 +224,7 @@ def _slot_descriptions(slot: int) -> list[OUPESSensorDescription]:
             device_class=SensorDeviceClass.POWER,
             state_class=SensorStateClass.MEASUREMENT,
             native_unit_of_measurement=UnitOfPower.WATT,
-            # Confirmed: attr 54 = B2 "OUTPUT W" in the app — total power
+            # Confirmed: attr 54 = B2 "OUTPUT W" in the app - total power
             # leaving the B2 (chain cable discharge to Mega + USB ports).
         ),
         OUPESSensorDescription(
@@ -235,13 +235,13 @@ def _slot_descriptions(slot: int) -> list[OUPESSensorDescription]:
             device_class=SensorDeviceClass.POWER,
             state_class=SensorStateClass.MEASUREMENT,
             native_unit_of_measurement=UnitOfPower.WATT,
-            # Confirmed: attr 53 = B2 "INPUT W" in the app — power entering
+            # Confirmed: attr 53 = B2 "INPUT W" in the app - power entering
             # the B2 via its secondary MPPT/DC port (solar panel or DC source).
         ),
     ]
 
 
-# ── Entity class ──────────────────────────────────────────────────────────────
+# -- Entity class -------------------------------------------------------------
 
 class OUPESMegaSensor(CoordinatorEntity[OUPESMegaCoordinator], SensorEntity):
     """A single numeric sensor reading from an OUPES Mega device."""
@@ -302,7 +302,7 @@ class OUPESMegaSensor(CoordinatorEntity[OUPESMegaCoordinator], SensorEntity):
         return desc.value_fn(raw) if desc.value_fn is not None else raw
 
 
-# ── Platform setup ────────────────────────────────────────────────────────────
+# -- Platform setup -----------------------------------------------------------
 
 async def async_setup_entry(
     hass: HomeAssistant,

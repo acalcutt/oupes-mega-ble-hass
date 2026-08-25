@@ -1,4 +1,4 @@
-"""OUPES Mega Power Station — Home Assistant custom integration."""
+"""OUPES Mega Power Station - Home Assistant custom integration."""
 from __future__ import annotations
 
 import asyncio

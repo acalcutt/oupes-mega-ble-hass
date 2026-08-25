@@ -25,16 +25,16 @@ SCAN_DURATION = 15.0
 # Max cold-probe retries per coordinator update cycle
 MAX_ATTEMPTS = 5
 
-# Config entry data key — the per-device 10-character hex init token.
-# Found at bytes 4–13 of BLE init packet 6 (from a btsnoop/PCAPdroid capture).
+# Config entry data key - the per-device 10-character hex init token.
+# Found at bytes 4-13 of BLE init packet 6 (from a btsnoop/PCAPdroid capture).
 # Per-device; obtained from the cloud API (auto) or a packet capture (manual).
 CONF_DEVICE_KEY = "device_key"
 
-# Config entry options key — whether to hold the BLE connection open permanently
+# Config entry options key - whether to hold the BLE connection open permanently
 # instead of polling every UPDATE_INTERVAL seconds.
 CONF_CONTINUOUS = "continuous_connection"
 
-# Config entry options — user-tuneable polling parameters (non-continuous mode).
+# Config entry options - user-tuneable polling parameters (non-continuous mode).
 CONF_POLL_INTERVAL = "poll_interval"        # seconds between polls (default 30)
 CONF_STALE_TIMEOUT = "stale_timeout"        # minutes before marking unavailable (default 15)
 
@@ -53,12 +53,12 @@ ATTR78_RUNTIME_MAX = 5940  # Default upper bound for runtime values (minutes) =
                            # reports noise during charging/idle. Overridden
                            # per-device via CONF_RUNTIME_MAX in the options flow.
 
-# Config entry option key — user-settable upper bound (minutes) for runtime attrs
+# Config entry option key - user-settable upper bound (minutes) for runtime attrs
 # (attr 30 and attr 78). Values above this are filtered as firmware noise. Default: 6000.
 CONF_RUNTIME_MAX = "runtime_max_minutes"
 
 
-# ── Product model catalog ─────────────────────────────────────────────────────
+# -- Product model catalog ----------------------------------------------------
 # Maps the 6-char ASCII product_id from BLE advertising to (model_name, series).
 # Source: AppParams.java in Cleanergy APK v1.4.1.
 
@@ -99,8 +99,8 @@ def series_from_product_id(product_id: str | None) -> str:
     return "unknown"
 
 
-# ── Per-series feature flags ──────────────────────────────────────────────────
-# Maps series key → set of setting DPID numbers the series is known to support.
+# -- Per-series feature flags -------------------------------------------------
+# Maps series key -> set of setting DPID numbers the series is known to support.
 # Source: StandByTimeoutFragment, ECOFragment, S2_V2SettingFragment, etc.
 # in the decompiled Cleanergy APK.
 #
@@ -142,8 +142,8 @@ _EXODUS_SETTINGS: frozenset[int] = frozenset({
 SERIES_SETTINGS: dict[str, frozenset[int]] = {
     # mega_1 uses the same settings as mega but is a separate key so that
     # binary_sensor.py / switch.py can give bit2 a different name:
-    #   mega_1 → "USB Output"  (bit2 is USB-A/C only, no Anderson port)
-    #   mega   → "Anderson & USB Output"  (bit2 controls Anderson+USB together)
+    #   mega_1 -> "USB Output"  (bit2 is USB-A/C only, no Anderson port)
+    #   mega   -> "Anderson & USB Output"  (bit2 controls Anderson+USB together)
     "mega_1":   _MEGA_SETTINGS,
     "mega":     _MEGA_SETTINGS,
     "exodus":   _EXODUS_SETTINGS,

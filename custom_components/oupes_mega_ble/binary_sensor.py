@@ -28,8 +28,8 @@ class OUPESBinarySensorDescription(BinarySensorEntityDescription):
 
 # attr 1 switchValue bitmask layout (from APK dcXt90Switch / dcUsbCarSwitch / acSwitch):
 #   bit0 (0x01) = AC output (all series)
-#   bit1 (0x02) = Car/DC output  ← Mega 1: car port only; Mega 2/3/5 + Guardian: car + 12V barrel jacks
-#   bit2 (0x04) = USB/Anderson/XT90  ← Mega 1: USB only; Mega 2/3/5: Anderson+USB grouped; Guardian: XT90
+#   bit1 (0x02) = Car/DC output  <- Mega 1: car port only; Mega 2/3/5 + Guardian: car + 12V barrel jacks
+#   bit2 (0x04) = USB/Anderson/XT90  <- Mega 1: USB only; Mega 2/3/5: Anderson+USB grouped; Guardian: XT90
 # Names are resolved per-series in async_setup_entry via _DC_OUTPUT_NAMES / _USB_OUTPUT_NAMES.
 BINARY_SENSOR_DESCRIPTIONS: tuple[OUPESBinarySensorDescription, ...] = (
     OUPESBinarySensorDescription(

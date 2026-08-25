@@ -54,9 +54,21 @@ Unrecognised product IDs get a conservative safe set of settings.
 
 2. Restart Home Assistant.
 
-### Option B — HACS (future)
+### Option B — HACS
 
-Not yet published to HACS. Use Option A for now.
+This repository is HACS-compatible, but it is not yet part of the HACS default
+catalog. Add it as a custom repository:
+
+1. Open **HACS → Integrations**.
+2. Open the three-dot menu and select **Custom repositories**.
+3. Enter `https://github.com/acalcutt/oupes-mega-hass`.
+4. Select **Integration**, click **Add**, and install **OUPES Mega BLE**.
+5. Restart Home Assistant.
+
+HACS installs the BLE integration from `custom_components/oupes_mega_ble/`.
+The WiFi integration lives in its own repository,
+[acalcutt/oupes-mega-wifi-hass](https://github.com/acalcutt/oupes-mega-wifi-hass),
+and is installed separately.
 
 ---
 

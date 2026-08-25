@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-pair_device.py — Pair an OUPES Mega over BLE, replicating the exact Cleanergy app flow.
+pair_device.py - Pair an OUPES Mega over BLE, replicating the exact Cleanergy app flow.
 
 Reverse-engineered from bugreport23 btsnoop HCI capture of a real pairing session.
 
@@ -275,7 +275,7 @@ async def pairing_cycle(mac: str, key: str, attempt: int,
             await client.start_notify(NOTIFY_CHAR, on_notify)
             await asyncio.sleep(2.0)  # CCCD settle
 
-            # ── Step 1: 0x01 AUTH ──
+            # -- Step 1: 0x01 AUTH --
             auth_seq = build_auth(key, ssid=ssid, psk=psk, region=region)
             print(f"\n  >> 0x01 AUTH ({len(auth_seq)} packets)...")
             for pkt in auth_seq:
@@ -285,7 +285,7 @@ async def pairing_cycle(mac: str, key: str, attempt: int,
             # Brief wait for handshake ACK
             await asyncio.sleep(1.0)
 
-            # ── Step 2: 0x03 handshake polling (~5 seconds) ──
+            # -- Step 2: 0x03 handshake polling (~5 seconds) --
             print(f"\n  >> 0x03 handshake polling (5s, every 300ms)...")
             for _ in range(17):  # ~5.1s at 300ms intervals
                 ts_pkt = _ts_pkt(0x03)
@@ -294,7 +294,7 @@ async def pairing_cycle(mac: str, key: str, attempt: int,
                 if got_03_ack or got_01_configured:
                     break
 
-            # ── Step 3: 0x01 timestamp + re-AUTH ──
+            # -- Step 3: 0x01 timestamp + re-AUTH --
             print(f"\n  >> 0x01 timestamp + re-AUTH...")
             ts01 = _ts_pkt(0x01)
             await client.write_gatt_char(WRITE_CHAR, ts01, response=False)
@@ -303,7 +303,7 @@ async def pairing_cycle(mac: str, key: str, attempt: int,
                 await client.write_gatt_char(WRITE_CHAR, pkt, response=False)
                 await asyncio.sleep(0.08)
 
-            # ── Step 4: More 0x03 handshake polling ──
+            # -- Step 4: More 0x03 handshake polling --
             print(f"\n  >> 0x03 handshake polling (another 5s)...")
             for _ in range(17):
                 ts_pkt = _ts_pkt(0x03)
@@ -312,7 +312,7 @@ async def pairing_cycle(mac: str, key: str, attempt: int,
                 if got_03_ack or got_01_configured:
                     break
 
-            # ── Step 5: 0x03 CLAIM data ──
+            # -- Step 5: 0x03 CLAIM data --
             claim_seq = build_claim(key)
             print(f"\n  >> 0x03 CLAIM data ({len(claim_seq)} packets)...")
             for i, pkt in enumerate(claim_seq):
@@ -320,7 +320,7 @@ async def pairing_cycle(mac: str, key: str, attempt: int,
                 await client.write_gatt_char(WRITE_CHAR, pkt, response=False)
                 await asyncio.sleep(0.05)
 
-            # ── Step 6: Keepalive and wait ──
+            # -- Step 6: Keepalive and wait --
             print(f"\n  >> Keepalive + wait 10s...")
             await client.write_gatt_char(WRITE_CHAR, KEEPALIVE, response=False)
             await asyncio.sleep(5.0)
@@ -330,7 +330,7 @@ async def pairing_cycle(mac: str, key: str, attempt: int,
                 await client.write_gatt_char(WRITE_CHAR, KEEPALIVE, response=False)
                 await asyncio.sleep(5.0)
 
-            # ── Step 7: Final AUTH check ──
+            # -- Step 7: Final AUTH check --
             if not got_01_configured and not got_telemetry:
                 print(f"\n  >> Final 0x01 AUTH attempt...")
                 ts01 = _ts_pkt(0x01)

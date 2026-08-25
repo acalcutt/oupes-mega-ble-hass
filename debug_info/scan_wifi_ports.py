@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scan_wifi_ports.py — Scan the OUPES Mega 1 for open TCP/UDP ports on its local IP.
+scan_wifi_ports.py - Scan the OUPES Mega 1 for open TCP/UDP ports on its local IP.
 
 The OUPES Mega 1 connects to the Alibaba Cloud broker at 47.252.10.9:8896
 only while a phone is BLE-paired via the Cleanergy app.  This script probes

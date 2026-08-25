@@ -34,13 +34,13 @@ class OUPESNumberDescription(NumberEntityDescription):
     dpid: int = 0
 
 
-# ── Setting entity descriptions ───────────────────────────────────────────────
+# -- Setting entity descriptions ----------------------------------------------
 # Only descriptions whose DPID is in the device's series feature set will be
 # created. native_min/max/step are set here; the Cmd3 command sends the raw
 # integer value.
 
 NUMBER_DESCRIPTIONS: tuple[OUPESNumberDescription, ...] = (
-    # ── Screen/display timeout ───────────────────────────────────────────
+    # -- Screen/display timeout -------------------------------------------
     OUPESNumberDescription(
         key="screen_timeout",
         dpid=41,
@@ -53,7 +53,7 @@ NUMBER_DESCRIPTIONS: tuple[OUPESNumberDescription, ...] = (
         native_max_value=3600,
         native_step=30,
     ),
-    # ── Standby timeouts (seconds) ────────────────────────────────────────
+    # -- Standby timeouts (seconds) ----------------------------------------
     OUPESNumberDescription(
         key="machine_standby",
         dpid=45,
@@ -114,7 +114,7 @@ NUMBER_DESCRIPTIONS: tuple[OUPESNumberDescription, ...] = (
         native_max_value=21600,
         native_step=600,
     ),
-    # ── ECO thresholds (watts) ────────────────────────────────────────────
+    # -- ECO thresholds (watts) --------------------------------------------
     OUPESNumberDescription(
         key="ac_eco_threshold",
         dpid=111,
