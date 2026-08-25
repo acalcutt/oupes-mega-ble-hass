@@ -61,13 +61,14 @@ catalog. Add it as a custom repository:
 
 1. Open **HACS → Integrations**.
 2. Open the three-dot menu and select **Custom repositories**.
-3. Enter `https://github.com/HeedfulCrayon/oupes-mega-ble-hass`.
+3. Enter `https://github.com/acalcutt/oupes-mega-hass`.
 4. Select **Integration**, click **Add**, and install **OUPES Mega BLE**.
 5. Restart Home Assistant.
 
 HACS installs the BLE integration from `custom_components/oupes_mega_ble/`.
-The WiFi integration in this repository remains a separate manual-install
-option; it is not part of the BLE HACS package.
+The WiFi integration lives in its own repository,
+[acalcutt/oupes-mega-wifi-hass](https://github.com/acalcutt/oupes-mega-wifi-hass),
+and is installed separately.
 
 ---
 

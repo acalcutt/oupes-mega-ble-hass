@@ -4,13 +4,13 @@
   "bluetooth": [
     {"local_name": "TT"}
   ],
-  "codeowners": ["@HeedfulCrayon"],
+  "codeowners": ["@acalcutt", "@HeedfulCrayon"],
   "config_flow": true,
   "dependencies": ["bluetooth"],
-  "documentation": "https://github.com/HeedfulCrayon/oupes-mega-ble-hass/blob/main/custom_components/oupes_mega_ble/README.md",
+  "documentation": "https://github.com/acalcutt/oupes-mega-hass/blob/main/custom_components/oupes_mega_ble/README.md",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/HeedfulCrayon/oupes-mega-ble-hass/issues",
+  "issue_tracker": "https://github.com/acalcutt/oupes-mega-hass/issues",
   "requirements": [],
   "version": "1.2.0"
 }

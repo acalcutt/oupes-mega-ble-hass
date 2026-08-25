@@ -1,8 +1,8 @@
 # OUPES Mega BLE brand assets
 
-Add the integration artwork to this directory:
-
 - `icon.png` — the square integration icon used by Home Assistant and HACS.
-- `logo.png` — optional wider artwork for surfaces that support a logo.
+- `logo.png` — wider artwork for surfaces that support a logo.
 
-The image files are intentionally not included in this repository yet.
+These are staged here for a future submission to the
+[home-assistant/brands](https://github.com/home-assistant/brands) repository,
+which is where HA and HACS actually load integration artwork from.
