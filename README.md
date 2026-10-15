@@ -44,9 +44,63 @@ device over BLE and exposes sensors, switches, and settings entities.
 
 ## Quick Start
 
+The two device families pair differently, and the difference is not cosmetic: on
+the newer family the older pairing path destroys the pairing rather than creating
+one. Check which you have before doing anything with the IoT button.
+
+How to tell: the device advertises the BLE name `TT` (Mega series) or `WP`
+(Guardian / D5 V2 / D5 6000 Plus). The Cleanergy app labels the second group
+Guardian.
+
+### Mega series (`TT`)
+
 1. Power on the OUPES device and press the IoT button (indicator flashes).
 2. HA auto-discovers the device — click the notification to set up.
-3. Choose **Create New Key** (factory-reset the device first: hold IoT 5 s).
+3. Choose **Create a new device key** (factory-reset the device first: hold IoT 5 s),
+   or **Enter an existing device key** if you already have one.
+
+### Guardian / D5 V2 (`WP`)
+
+These stations authenticate only the pairing that the Cleanergy app wrote into them.
+Home Assistant does not create a pairing on this family, it reuses the one the app
+left behind.
+
+1. **Add the station in the Cleanergy app first**, over Bluetooth, with the phone
+   next to the unit. A station that has never been added to the app has no pairing
+   for Home Assistant to reuse, and it refuses every connection attempt.
+2. **Get the account's numeric user ID.** The app does not display it anywhere, so do
+   not look for a screen that shows it. One way to read it is the vendor login the app
+   itself uses — the response carries it as `info.uid`:
+
+   ```console
+   $ curl -s -X POST http://api.upspowerstation.top/api/app/user/login        -H 'Content-Type: application/json'        -d '{"mail":"you@example.com","passwd":"...","lang":"en","platform":"android","systemVersion":34}'
+   ```
+
+   The endpoint is plain HTTP with no TLS, so send it only from a network you trust, and
+   never paste the response into a bug report. With the number in hand, the device key is
+   what the vendor's own app computes: `md5(user_id)[:10]`, lowercase hex.
+
+   ```console
+   $ python -c "import hashlib; print(hashlib.md5(b'12345').hexdigest()[:10])"
+   ```
+
+3. **Release the station from your phone** — force-stop the app or switch the phone's
+   Bluetooth off. The station answers one Bluetooth client at a time, and Home
+   Assistant holds the connection continuously while the entry is loaded.
+4. In Home Assistant choose **Enter an existing device key** and enter the value from
+   step 2.
+
+> **Do not use "Create a new device key" on this family**, and do not hold the IoT
+> button for 5 seconds to get there. That option exists for the older stations. On a
+> Guardian the reset clears the pairing the app wrote, and the new key the integration
+> creates is not accepted: measured twice on a Guardian 6000 V2, both attempts ended
+> in `pairing_timeout`. Recovery is to re-pair the station in the Cleanergy app.
+
+**Fetch key from Cleanergy cloud account** cannot work on this family. Measured on a
+Guardian 6000 V2: the vendor's device record carries `device_key` as the literal string
+`"WP"`, not a key, so the 10-hex-character check in `cloud_api._extract_key` rejects it.
+Nothing is wrong with the account or the login - this family's key is not stored on the
+vendor's servers, which is why step 2 derives it instead.
 
 ---
 
@@ -54,18 +108,21 @@ device over BLE and exposes sensors, switches, and settings entities.
 
 | Scenario | Install |
 |----------|---------|
-| Simple local-only setup, device within BLE range | this integration |
-| Device too far for BLE, or you want push telemetry | [oupes-mega-wifi-hass](https://github.com/acalcutt/oupes-mega-wifi-hass) |
-| Want both channels for redundancy | both |
+| Mega series (`TT`) within Bluetooth range | this integration |
+| Mega series too far for BLE, or you want push telemetry | [oupes-mega-wifi-hass](https://github.com/acalcutt/oupes-mega-wifi-hass) |
+| Guardian / D5 V2 (`WP`) | this integration — Bluetooth is the only transport |
 
 **BLE is the easiest path.** It works entirely over Bluetooth with zero network
 configuration — no firewall rules, no port forwarding, no DNS tricks.
 
-**WiFi requires network-level redirection.** The device firmware hardcodes the
-cloud broker IP (`47.252.10.9`), so NAT rules are needed to intercept the
-device's outbound connections and redirect them to your HA instance. More
-powerful (push-based, real-time, works at any distance) but a more involved
-setup.
+**WiFi redirection applies to the older models only.** Their firmware hardcodes the
+cloud broker IP (`47.252.10.9`), so NAT rules are needed to intercept the device's
+outbound connections and redirect them to your HA instance. More powerful (push-based,
+real-time, works at any distance) but a more involved setup.
+
+On Guardian / D5 V2 firmware there is no local network protocol to intercept, so the
+WiFi integration cannot be used with these stations regardless of how it is configured.
+If the station is out of Bluetooth range, the fix is a Bluetooth proxy nearer to it.
 
 ---
 
