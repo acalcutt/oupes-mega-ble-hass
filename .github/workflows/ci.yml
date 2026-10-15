@@ -1,0 +1,98 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  protocol-tests:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: pytest
+        run: pytest -q
+
+      # The suite is deliberately dependency-free so it also runs without pytest.
+      # Every test_*.py is executed, so a new file cannot be added to pytest and
+      # quietly left out of the standalone path.
+      - name: Standalone runner
+        run: |
+          for f in tests/test_*.py; do echo "== $f"; python "$f" || exit 1; done
+
+  metadata:
+    name: Integration metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Manifests parse and agree
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+
+          manifest = json.loads(
+              pathlib.Path("custom_components/oupes_mega_ble/manifest.json").read_text(encoding="utf-8")
+          )
+          hacs = json.loads(pathlib.Path("hacs.json").read_text())
+          strings = json.loads(
+              pathlib.Path("custom_components/oupes_mega_ble/strings.json").read_text(encoding="utf-8")
+          )
+          translations = json.loads(
+              pathlib.Path(
+                  "custom_components/oupes_mega_ble/translations/en.json"
+              ).read_text(encoding="utf-8")
+          )
+
+          problems = []
+          if manifest.get("domain") != "oupes_mega_ble":
+              problems.append(f"unexpected domain {manifest.get('domain')!r}")
+          if manifest.get("codeowners", []) == []:
+              problems.append("codeowners is empty")
+          if not manifest.get("version"):
+              problems.append("manifest has no version")
+          if not hacs.get("name"):
+              problems.append("hacs.json has no name")
+          if sorted(strings) != sorted(translations):
+              problems.append("strings.json and translations/en.json disagree")
+          for key in ("bluetooth", "dependencies", "integration_type"):
+              if key not in manifest:
+                  problems.append(f"manifest missing {key!r}")
+
+          if problems:
+              sys.exit("metadata problems: " + "; ".join(problems))
+          print(f"ok: {manifest['domain']} {manifest['version']} ({hacs['name']})")
+          PY
+
+      - name: Bluetooth filter covers both families
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          m = json.loads(
+              pathlib.Path("custom_components/oupes_mega_ble/manifest.json").read_text(encoding="utf-8")
+          )
+          names = {e.get("local_name") for e in m.get("bluetooth", [])}
+          missing = {"TT", "WP"} - names
+          if missing:
+              sys.exit(f"manifest bluetooth filter is missing {sorted(missing)}")
+          print("ok: advertisement filter accepts", sorted(names))
+          PY

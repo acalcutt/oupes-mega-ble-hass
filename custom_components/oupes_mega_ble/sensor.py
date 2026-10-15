@@ -132,6 +132,30 @@ SENSOR_DESCRIPTIONS: tuple[OUPESSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
     ),
+    # --- Per-input power for the two DC / PV inputs ---------------------------------
+    # The Guardian 6000 V2 reports both inputs inside the single dpid-23 field as
+    # two uint16 halves (see WP_SPLIT_U16_DPIDS in protocol.py).  The parser puts
+    # the aggregate back under dpid 23 (so "Solar Input Power" above stays right)
+    # and publishes the individual inputs under pseudo-dpids 2301/2302, which are
+    # only ever read back here via data_key and never sent to the device.
+    OUPESSensorDescription(
+        key="dc_input_1_power",
+        attr=23,
+        data_key=2301,
+        name="DC Input 1 Power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    OUPESSensorDescription(
+        key="dc_input_2_power",
+        attr=23,
+        data_key=2302,
+        name="DC Input 2 Power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
     OUPESSensorDescription(
         key="remaining_runtime",
         attr=30,
@@ -298,11 +322,52 @@ class OUPESMegaSensor(CoordinatorEntity[OUPESMegaCoordinator], SensorEntity):
             raw = self.coordinator.data["attrs"].get(lookup)
 
         if raw is None:
+            if desc.key == "expansion_battery_count":
+                return _derive_ext_count(self.coordinator.data.get("ext_batteries"))
             return None
         return desc.value_fn(raw) if desc.value_fn is not None else raw
 
 
+# -- Expansion pack count -----------------------------------------------------
+
+def _derive_ext_count(ext_batteries: dict | None) -> int | None:
+    """Number of expansion packs that reported telemetry in the current update.
+
+    The firmware exposes a pack count on dpid 51, but only answers it when that dpid
+    is queried explicitly, and the coordinator queries just the settings dpids of the
+    detected series -- so on this model the value never arrives and the entity would
+    stay unknown.  The per-pack telemetry (dpids 53/54/78-80, slot-tagged by dpid 101)
+    does arrive, so count the slots that carry data instead.
+
+    This tracks hardware changes on its own: a third pack shows up as slot 2 on the
+    next poll and the count becomes 3, and a pack that is switched off stops filling
+    its slot dict (the coordinator rebuilds ``ext_batteries`` from scratch every
+    update) so the count falls back.  Slot 1 is pre-seeded as an empty dict by the
+    coordinator, which is why empty slots are not counted; an empty result is reported
+    as unknown rather than a misleading zero.
+    """
+    if not ext_batteries:
+        return None
+    count = 0
+    for slot, slot_data in ext_batteries.items():
+        try:
+            slot_no = int(slot)
+        except (TypeError, ValueError):
+            continue
+        if slot_no >= 0 and slot_data:
+            count += 1
+    return count or None
+
+
 # -- Platform setup -----------------------------------------------------------
+
+# Sensors that only make sense on the "WP" firmware family (Guardian / D5 V2),
+# where attr 23 packs the power of both DC inputs.  On every other model attr 23
+# is a single wattage, so these two entities would sit unavailable forever.
+_WP_ONLY_SENSOR_KEYS = frozenset(
+    {"dc_input_1_power", "dc_input_2_power"}
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -319,9 +384,11 @@ async def async_setup_entry(
         return desc
 
     # Add main device sensors immediately.
+    wp_family = series == "guardian"
     async_add_entities(
         OUPESMegaSensor(coordinator, _resolve(desc), entry)
         for desc in SENSOR_DESCRIPTIONS
+        if wp_family or desc.key not in _WP_ONLY_SENSOR_KEYS
     )
 
     # Ext-battery entities are created on-demand the first time each slot

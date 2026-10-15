@@ -70,6 +70,8 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
         *,
         device_key: str = "bd236b1695",
         product_id: str = "",
+        open_id: str = "",
+        user_id: int = 0,
         continuous: bool = False,
         poll_interval_seconds: int = 30,
         stale_timeout_minutes: int = 15,
@@ -87,17 +89,34 @@ class OUPESMegaCoordinator(DataUpdateCoordinator):
         self.address = address
         self.device_name = name
         self.product_id = product_id
+        self.open_id = open_id
+        self.user_id = user_id
         self.model_name = model_name_from_product_id(product_id)
         self.last_successful_poll: datetime | None = None
         self.stale_timeout = timedelta(minutes=stale_timeout_minutes)
         self._pending_command: bytes | None = None
-        self._init_sequence = build_init_sequence(device_key)
+        self._init_sequence = build_init_sequence(
+            device_key, open_id=open_id, user_id=user_id
+        )
         self._continuous = continuous
         self._live_data: OUPESData | None = None
         self._continuous_task: asyncio.Task | None = None
         # Build Cmd2 query packets that read this device's supported settings.
         # Split into small batches (7 DPIDs each) matching the Cleanergy app.
         series = series_from_product_id(product_id)
+        if series == "guardian" and not (open_id and user_id):
+            # Guardian / D5 V2 stations refuse an AUTH frame that does not carry the
+            # owner's cloud identity: they answer 03 80 01 01 01 and drop the link
+            # about four seconds after connecting, which otherwise looks like a
+            # range or pairing problem.
+            _LOGGER.warning(
+                "%s (%s) is a Guardian / D5 V2 ('WP') station: it needs the cloud "
+                "openId and userId of the account that owns it. Open the "
+                "integration options and fill in both, otherwise the station will "
+                "reject the connection and drop it after a few seconds",
+                name,
+                address,
+            )
         supported_dpids = sorted(SERIES_SETTINGS.get(series, frozenset()))
         self._settings_query_pkts: list[bytes] = (
             build_query_commands(supported_dpids) if supported_dpids else []

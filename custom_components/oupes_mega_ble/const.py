@@ -30,6 +30,16 @@ MAX_ATTEMPTS = 5
 # Per-device; obtained from the cloud API (auto) or a packet capture (manual).
 CONF_DEVICE_KEY = "device_key"
 
+# Config entry options - the cloud identity of the station's owner.  Only the
+# firmware family that advertises the BLE name "WP" (Guardian / D5 V2 power
+# stations, e.g. the Guardian 6000 V2) needs these: their AUTH frame embeds the
+# owner's cloud openId and numeric userId, and the station refuses every other
+# identity (it answers 03 80 01 01 01 and drops the link after ~4 s).  Legacy
+# "TT" stations leave both empty and are unaffected.
+# openId is read from the cloud device record, userId from the cloud login response.
+CONF_OPEN_ID = "open_id"
+CONF_USER_ID = "user_id"
+
 # Config entry options key - whether to hold the BLE connection open permanently
 # instead of polling every UPDATE_INTERVAL seconds.
 CONF_CONTINUOUS = "continuous_connection"

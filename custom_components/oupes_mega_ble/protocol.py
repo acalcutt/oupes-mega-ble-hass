@@ -222,8 +222,88 @@ def build_query_commands(dpids: list[int], batch_size: int = 7) -> list[bytes]:
     return packets
 
 
-def build_init_sequence(device_key: str = "bd236b1695", ssid: str = "", psk: str = "", region: str = "wp-cn") -> list[bytes]:
-    """Return AUTH sequence (formerly APP_INIT_SEQUENCE) rebuilt for *device_key*.
+# --------------------------------------------------------------------------
+# AUTH / config-net-info sequence  --  RECONSTRUCTED FROM THE CLEANERGY APK
+# (SingleBleDevice.getBleToDeviceSendConfigNetInfoCmd1, "WP" branch).
+#
+# Payload (170 bytes) = 01 LEN ssid[32] passwd[64] bssid[6] key[10]
+#                       openId[33] cmd[4] cmd[4] rsvd[10] userId[5]
+# LEN = 0xA8 (168 = bytes following the length byte) for devices whose BLE
+# name is "WP" (Guardian / power-station family).  Empty SSID is filled with
+# 0x01 bytes (NOT 0x02 -- with 0x02 the station rejects the frame), every
+#                       other field is zero right-padded.
+# Framing: 20-byte frames of [prefix, idx, 17 payload bytes, CRC8-SMBUS],
+# followed by the 0x89 region frame.
+#
+# openId and userId MUST belong to the cloud account that owns the station --
+# the firmware rejects the AUTH otherwise (reply byte 4 = 0x01) and the station
+# drops the link after ~4 s.  They are supplied by the caller from the
+# integration options (openId comes from the cloud device record, userId from
+# the cloud login response); nothing about the account is stored here.
+# --------------------------------------------------------------------------
+OUPES_CMD_FIELD = 16          # value the app passes as `cmd` for BLE
+OUPES_LEN_BYTE = 0xA8         # 168-byte field block (WP / power stations)
+
+
+def _field(s: str, n: int) -> bytes:
+    """ASCII field, zero right-padded (matches adjustWidthBaseStr)."""
+    return s.encode("ascii", "ignore").ljust(n, b"\x00")[:n]
+
+
+def build_config_net_info(
+    device_key: str,
+    open_id: str = "",
+    user_id: int = 0,
+    ssid: str = "",
+    psk: str = "",
+    bssid: str = "",
+    cmd: int = OUPES_CMD_FIELD,
+    prefix: int = 0x01,
+) -> list[bytes]:
+    """Build the app's config-net-info (AUTH) frame sequence.
+
+    This is the packet the Cleanergy app sends to install / verify the
+    10-character device key.  Sending anything shorter (e.g. a key plus a
+    filler token) makes the station answer `03 80 01 01 01` and disconnect.
+    """
+    key = device_key.strip()
+    if not key:
+        return []
+    ssid_f = b"\x01" * 32 if not ssid else _field(ssid, 32)
+    cmd_b = bytes([(cmd >> 24) & 0xFF, (cmd >> 16) & 0xFF, (cmd >> 8) & 0xFF, cmd & 0xFF])
+    body = bytearray()
+    body += bytes([OUPES_LEN_BYTE])
+    body += ssid_f
+    body += _field(psk, 64)
+    body += _field(bssid.replace(":", ""), 6)
+    body += _field(key, 10)
+    body += _field(open_id, 33)
+    body += cmd_b
+    body += cmd_b
+    body += b"\x00" * 10
+    body += user_id.to_bytes(5, "big")
+    payload = bytes([0x01]) + bytes(body)
+
+    frames = []
+    for idx in range((len(payload) + 16) // 17):
+        chunk = payload[idx * 17 : idx * 17 + 17].ljust(17, b"\x00")
+        p = bytearray([prefix, idx]) + chunk
+        p.append(_crc8(bytes(p[:19])))
+        frames.append(bytes(p))
+    end = bytearray(20)
+    end[0], end[1] = prefix, 0x89
+    end[19] = _crc8(bytes(end[:19]))
+    frames.append(bytes(end))
+    return frames
+
+
+def _build_init_sequence_legacy(
+    device_key: str = "bd236b1695",
+    ssid: str = "",
+    psk: str = "",
+    region: str = "wp-cn",
+) -> list[bytes]:
+    """Original "TT" AUTH sequence (formerly APP_INIT_SEQUENCE) rebuilt for *device_key*.
 
     When *ssid*/*psk* are provided, builds the WiFi provisioning variant:
       pkts 0-1 : WiFi SSID (15 + 17 chars max)
@@ -315,6 +395,150 @@ def build_init_sequence(device_key: str = "bd236b1695", ssid: str = "", psk: str
         return pkts
 
 
+def build_init_sequence(
+    device_key: str = "bd236b1695",
+    ssid: str = "",
+    psk: str = "",
+    region: str = "wp-cn",
+    open_id: str = "",
+    user_id: int = 0,
+) -> list[bytes]:
+    """Return the AUTH frame sequence that installs / verifies *device_key*.
+
+    Guardian and D5 V2 stations (the family that advertises the BLE name ``WP``,
+    e.g. the Guardian 6000 V2) authenticate with the account-bound
+    config-net-info frame, so pass the station owner's *open_id* and *user_id*.
+    Without them these stations answer ``03 80 01 01 01`` and drop the link about
+    four seconds after connecting.
+
+    Legacy stations (BLE name ``TT``) leave both empty and receive the original
+    sequence byte-for-byte unchanged.
+    """
+    if (open_id or user_id) and not ssid:
+        return build_config_net_info(device_key, open_id=open_id, user_id=user_id)
+    return _build_init_sequence_legacy(device_key, ssid=ssid, psk=psk, region=region)
+
+
+
+# --------------------------------------------------------------------------
+# Guardian / "WP" telemetry stream
+#
+# This firmware family answers queries with ONE TLV stream that is packed
+# tightly across packet boundaries (entries straddle the 17-byte payload
+# slices), and the notifications are prefixed 0x03 instead of 0x01:
+#
+#     [0x02][0x05][dpid][value: uint32 little-endian]    7 bytes per entry
+#
+# Notifications are ordered by pkgSn (byte 1: low 7 bits = index, bit 7 =
+# last packet).  IMPORTANT: on the first packet byte 2 is the TLV tag 0x02,
+# NOT a Cmd2/Cmd3 echo byte, so it must not be stripped the way settings
+# responses are.
+# --------------------------------------------------------------------------
+WP_TLV_TAG = 0x02
+WP_TLV_LEN = 0x05
+WP_TLV_SIZE = 7
+
+# DPIDs whose 4-byte value slot holds TWO uint16 halves instead of one uint32.
+# On the Guardian 6000 V2, dpid 23 (solar / PV input power) is the power of the two
+# DC inputs, low half first.  Decoded as a plain uint32 it shows up as ~131,000,000 W.
+# Verified against the real station -- the two halves add up to dpid 21 (Total Input
+# Power) exactly in every sample taken: 0x07d107cf -> 1999+2001 = 4000 W, 0x07d007ce
+# -> 1998+2000 = 3998 W, 0x07d20287 -> 647+2002 = 2649 W (each matched dpid 21).
+# PV voltage is reported elsewhere (reads ~140 V), so these are watts, not 0.1 V.
+#
+# The aggregate stays under dpid 23 so the existing "Solar Input Power" entity is
+# correct on its own; the two readings are also published under pseudo-dpids that are
+# NEVER sent to the device (queries are built from ATTR_MAP, which does not contain
+# them) and are read back by sensor.py through data_key.  Splitting it this way means
+# an integration update that overwrites sensor.py only loses the two extra entities
+# and leaves the aggregate reading intact.
+WP_SPLIT_U16_DPIDS: set[int] = {23}
+WP_SPLIT_U16_PSEUDO_BASE: dict[int, int] = {23: 2301}
+# Above this, a dpid-23 reading cannot be plain watts: no supported unit takes more
+# than ~6 kW of input, so a value >= 65536 W must be two packed uint16 readings.  This
+# also keeps the split from ever firing on the models where dpid 23 genuinely is a
+# single solar-watts field (that reading never exceeds 65535 W).
+WP_SPLIT_U16_ABSURD = 0x10000
+
+
+def _split_packed_power(parsed: dict) -> dict:
+    """Post-process ANY parsed dict, splitting packed-uint16 dpids.
+
+    Applied to the output of every parser in this module, because the same field is
+    reachable through more than one code path: the packed WP stream, the compact
+    Cmd2/Cmd3 TLV reader and the standard 0x0A-tagged telemetry reader all decode
+    dpid 23 as one little-endian uint32.  Only the WP parser knows about the packing,
+    so values that arrive via a fallback path would otherwise surface as ~80,000,000 W.
+    """
+    try:
+        for dpid in WP_SPLIT_U16_DPIDS:
+            val = parsed.get(dpid)
+            base = WP_SPLIT_U16_PSEUDO_BASE[dpid]
+            if base in parsed or base + 1 in parsed:
+                continue  # already split (also makes this idempotent)
+            if isinstance(val, int) and val >= WP_SPLIT_U16_ABSURD:
+                lo = val & 0xFFFF
+                hi = val >> 16
+                parsed[dpid] = lo + hi
+                parsed[base] = lo
+                parsed[base + 1] = hi
+    except Exception:  # never let a decode nicety break a poll cycle
+        pass
+    return parsed
+
+
+
+def _wp_looks_like(packets) -> bool:
+    try:
+        f = packets[0]
+    except Exception:
+        return False
+    return len(f) > 4 and f[2] == WP_TLV_TAG and f[3] == WP_TLV_LEN
+
+
+def _wp_payload(packets) -> bytes:
+    """Concatenate the 17-byte payload slices of a notification sequence."""
+    buf = bytearray()
+    for pkt in packets:
+        if len(pkt) > 3:
+            buf.extend(pkt[2 : len(pkt) - 1])
+    return bytes(buf)
+
+
+def parse_wp_stream(payload: bytes) -> dict[int, int]:
+    """Decode a [0x02][0x05][dpid][uint32-le] stream into {dpid: value}."""
+    results: dict[int, int] = {}
+    i = 0
+    while i + WP_TLV_SIZE <= len(payload):
+        if payload[i] == WP_TLV_TAG and payload[i + 1] == WP_TLV_LEN:
+            dpid = payload[i + 2]
+            val = int.from_bytes(payload[i + 3 : i + 7], "little")
+            if dpid in WP_SPLIT_U16_DPIDS:
+                lo = val & 0xFFFF
+                hi = val >> 16
+                results[dpid] = lo + hi
+                base = WP_SPLIT_U16_PSEUDO_BASE[dpid]
+                results[base] = lo
+                results[base + 1] = hi
+            else:
+                results[dpid] = val
+            i += WP_TLV_SIZE
+        else:
+            break
+    # Trust the decode only when the stream was consumed cleanly (the last
+    # packet of a notification is zero-padded), so legacy "TT" traffic falls
+    # through to the parsers below unchanged.
+    tail = payload[i:]
+    truncated = (
+        0 < len(tail) < WP_TLV_SIZE
+        and tail[0] == WP_TLV_TAG
+        and (len(tail) < 2 or tail[1] == WP_TLV_LEN)
+    )
+    if results and (all(b == 0 for b in tail) or truncated):
+        return results
+    return {}
+
+
 # Packet parser
 
 def parse_ble_packet(data: bytearray) -> dict[int, int]:
@@ -339,6 +563,11 @@ def parse_ble_packet(data: bytearray) -> dict[int, int]:
     results: dict[int, int] = {}
     if len(data) < 3:
         return results
+
+    if len(data) > 5 and data[2] == WP_TLV_TAG and data[3] == WP_TLV_LEN:
+        wp = parse_wp_stream(bytes(data[2 : len(data) - 1]))
+        if wp:
+            return wp
 
     pkt_type = data[1]
     pkt_index = pkt_type & 0x7F
@@ -397,6 +626,12 @@ def parse_packet_sequence(packets: list[bytearray]) -> dict[int, int]:
     if not packets:
         return {}
 
+    # Guardian/WP packed TLV stream (see note above)
+    if _wp_looks_like(packets):
+        wp = parse_wp_stream(_wp_payload(packets))
+        if wp:
+            return wp
+
     # Single-packet fast path: delegate to per-packet parser
     first = packets[0]
     if len(packets) == 1:
@@ -438,3 +673,26 @@ def parse_packet_sequence(packets: list[bytearray]) -> dict[int, int]:
             j += 1
 
     return results
+
+
+# --------------------------------------------------------------------------
+# Public entry points -- apply _split_packed_power() to whatever a parser returns
+#
+# coordinator.py imports parse_ble_packet / parse_packet_sequence by name, so
+# wrapping them here (instead of editing every return path inside them) guarantees
+# a packed uint16 field is split no matter which reader decoded the packet, and no
+# matter whether a WP-shaped sequence was recognised by parse_wp_stream() or fell
+# through to the compact / 0x0A-tagged readers.
+# --------------------------------------------------------------------------
+_parse_ble_packet_impl = parse_ble_packet
+_parse_packet_sequence_impl = parse_packet_sequence
+
+
+def parse_ble_packet(data: bytearray) -> dict[int, int]:
+    """Parse one notification packet, then unpack any packed uint16 dpids."""
+    return _split_packed_power(_parse_ble_packet_impl(data))
+
+
+def parse_packet_sequence(packets: list[bytearray]) -> dict[int, int]:
+    """Parse a whole notification sequence, then unpack any packed uint16 dpids."""
+    return _split_packed_power(_parse_packet_sequence_impl(packets))

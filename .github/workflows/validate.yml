@@ -1,6 +1,13 @@
 name: Validate
 
 on:
+  # push is here deliberately. With only `pull_request`, a commit that lands on the
+  # default branch without a PR is never hassfest-validated: four invalid error-string
+  # blocks sat on a branch through a whole release cycle because the tests workflow was
+  # green and this one only ever ran on PRs.
+  push:
+    branches:
+      - main
   pull_request:
   schedule:
     - cron: "0 0 * * *"

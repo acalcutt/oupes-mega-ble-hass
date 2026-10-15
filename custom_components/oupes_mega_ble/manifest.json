@@ -2,7 +2,8 @@
   "domain": "oupes_mega_ble",
   "name": "OUPES Power Station BLE",
   "bluetooth": [
-    {"local_name": "TT"}
+    {"local_name": "TT"},
+    {"local_name": "WP"}
   ],
   "codeowners": ["@acalcutt", "@HeedfulCrayon"],
   "config_flow": true,

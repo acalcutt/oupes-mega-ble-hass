@@ -30,6 +30,46 @@ applies model-specific feature sets (settings, entity availability) automaticall
 
 Unrecognised product IDs get a conservative safe set of settings.
 
+### Guardian / D5 V2 stations (BLE name `WP`)
+
+The Guardian family — the **Guardian 6000 V2** (`D5 V2`, product ID `95haDY`) and
+its siblings — advertises the BLE name **`WP`** instead of `TT`, and differs from
+the Mega family in three ways that matter here:
+
+1. **AUTH carries the owner's cloud identity.** Rather than the key plus random
+   token a Mega accepts, these stations expect the *config-net-info* frame, which
+   embeds the **openId** and numeric **userId** of the Cleanergy account the
+   station is bound to. If either is missing, or belongs to a different account,
+   the station replies `03 80 01 01 01` and drops the link about four seconds
+   after connecting — which looks exactly like a range problem. Enter both under
+   **Integrations → OUPES → Configure**; the integration logs a warning at
+   startup when it sees a Guardian / D5 V2 without them.
+2. **Telemetry is one packed TLV stream** — `[0x02][0x05][dpid][uint32 LE]`,
+   7 bytes per entry, entries straddling the 17-byte payload slices, and
+   notifications prefixed `0x03` instead of `0x01`. `parse_wp_stream()` handles
+   it; the existing parsers are unchanged, so `TT` devices are unaffected.
+3. **Attr 23 packs two readings.** On these units it carries the power of **both
+   DC inputs** as two little-endian uint16 halves, low half first, so decoding it
+   as a single uint32 gives roughly 131,000,000 W. The sum stays published as
+   **Solar Input Power** (attr 23) and each input appears separately as **DC Input
+   1 Power** and **DC Input 2 Power**. Other models use attr 23 as one wattage, so
+   the fallback split only engages from 65536 W upward — a figure no supported
+   station can draw.
+
+Tested on a single Guardian 6000 V2 with two expansion battery packs.
+
+#### Finding your openId and userId
+
+Both come from the same cloud API the official app uses
+(`api.upspowerstation.top`):
+
+- **openId** — the `openId` of the station's record in the device-list response.
+- **userId** — the `userId` returned by the login request.
+
+They must belong to the account the station is currently bound to, and changing
+either one means re-pairing the station.
+
+
 ### USB Bluetooth adapter for HA
 
 1. Plug any standard USB Bluetooth 4.0+ adapter into your HA server.
@@ -143,13 +183,15 @@ retrieved key is saved.
 | USB-A Output | 8 | W | USB-A port output power |
 | Total Input Power | 21 | W | Grid + solar combined |
 | Grid Input Power | 22 | W | Grid only |
-| Solar Input Power | 23 | W | MPPT solar input |
+| Solar Input Power | 23 | W | MPPT solar input. On Guardian / D5 V2 stations attr 23 packs both DC inputs as two uint16 halves; the sum is published here and each input appears below |
+| DC Input 1 Power | 23 (low half) | W | Guardian / D5 V2 only — power on the first DC input |
+| DC Input 2 Power | 23 (high half) | W | Guardian / D5 V2 only — power on the second DC input |
 | Remaining Runtime | 30 | min | At current discharge rate. Clamped to the configured runtime cap (default 5940 min / 99 h) when charging or idle. |
 | Main Unit Temperature | 32 | °F | Internal temperature (÷10; e.g. raw 963 → 96.3 °F) |
 | External Battery 1–N Runtime | 78 | min | Per battery module. Clamped to the configured runtime cap (default 5940 min / 99 h) when charging or idle. |
 | External Battery 1–N Charge | 79 | % | Direct battery percentage (raw value = %) |
 | External Battery 1–N Temperature | 80 | °F | Per module temperature (÷10; e.g. 878 → 87.8 °F) |
-| Connected Expansion Batteries | 51 | — | Count of connected expansion battery packs (0–2 on Mega 1) |
+| Connected Expansion Batteries | 51 | — | Count of connected expansion battery packs (0–2 on Mega 1). On models that do not answer attr 51 unless queried, this is derived from the slots reporting per-pack telemetry, so it still follows packs being added or removed |
 
 > **Battery modules:** The Mega 1 has two **internal** battery modules (slots
 > 1 and 2). External **OUPES B2 Expansion Batteries** (LiFePO4, ~2 kWh each)
@@ -322,6 +364,8 @@ key used by the WiFi integration).
 | Settings entities blank/unknown | Frequent connection gaps | Enable debug raw logging and check for gaps >2 min — indicates BLE range issues |
 | "Cold-probe drop" repeated | BLE interference or device busy | Usually self-resolves on next poll |
 | Setup fails with ConfigEntryNotReady | Device not reachable at startup | HA will retry — power on the device |
+| Connects, then the link drops after ~4 s, on repeat | Guardian / D5 V2 (`WP`) station with no cloud openId/userId | Enter both in the integration options; the startup log says so explicitly |
+| DC Input 1 / DC Input 2 Power do not exist | Not a Guardian / D5 V2 station | Those two entities are only created for the `WP` family, where attr 23 carries both inputs |
 
 Enable debug logging for more detail:
 

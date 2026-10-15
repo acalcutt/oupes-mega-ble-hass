@@ -81,6 +81,12 @@ setup.
 Model-specific features (settings, entity names) are applied automatically
 based on the BLE product ID.
 
+> **Guardian / D5 V2 stations** (e.g. the Guardian 6000 V2) advertise the BLE name
+> **`WP`** rather than `TT`, and their AUTH frame must carry the **openId** and
+> **userId** of the Cleanergy account that owns the station — without both the
+> station rejects the connection and drops it after a few seconds. See
+> [Guardian / D5 V2 stations](custom_components/oupes_mega_ble/README.md#guardian--d5-v2-stations-ble-name-wp).
+
 ---
 
 ## Protocol Documentation

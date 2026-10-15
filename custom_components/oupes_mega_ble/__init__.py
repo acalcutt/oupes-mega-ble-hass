@@ -17,10 +17,12 @@ from .const import (
     CONF_DEBUG_RAW,
     CONF_DEVICE_KEY,
     CONF_NAME,
+    CONF_OPEN_ID,
     CONF_POLL_INTERVAL,
     CONF_PRODUCT_ID,
     CONF_RUNTIME_MAX,
     CONF_STALE_TIMEOUT,
+    CONF_USER_ID,
     DOMAIN,
     STALE_TIMEOUT,
     UPDATE_INTERVAL,
@@ -47,6 +49,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         CONF_STALE_TIMEOUT, int(STALE_TIMEOUT.total_seconds() // 60)
     )
     runtime_max: int = entry.options.get(CONF_RUNTIME_MAX, ATTR78_RUNTIME_MAX)
+
+    # Guardian / D5 V2 ("WP") stations bind their AUTH frame to the owner's cloud
+    # identity; every other model leaves both unset.
+    open_id: str = str(entry.options.get(CONF_OPEN_ID, "") or "").strip()
+    try:
+        user_id: int = int(entry.options.get(CONF_USER_ID, 0) or 0)
+    except (TypeError, ValueError):
+        user_id = 0
+
     device_key: str = (
         entry.options.get(CONF_DEVICE_KEY)
         or entry.data.get(CONF_DEVICE_KEY)
@@ -62,6 +73,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass, address, name,
         device_key=device_key,
         product_id=entry.data.get(CONF_PRODUCT_ID, ""),
+        open_id=open_id,
+        user_id=user_id,
         continuous=continuous,
         poll_interval_seconds=poll_interval,
         stale_timeout_minutes=stale_timeout,

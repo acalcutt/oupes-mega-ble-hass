@@ -38,6 +38,10 @@ This document summarizes findings from reverse engineering the OUPES Mega 1's co
   - [Packet Format](#packet-format)
   - [BLE Output Control](#ble-output-control)
   - [BLE Python Example](#ble-python-example)
+- [Guardian / D5 V2 BLE Variant (`WP`)](#guardian--d5-v2-ble-variant-wp)
+  - [AUTH: config-net-info frame](#auth-config-net-info-frame)
+  - [Telemetry: packed TLV stream](#telemetry-packed-tlv-stream)
+  - [Attr 23 packs both DC inputs](#attr-23-packs-both-dc-inputs)
 - [Telemetry Attribute Map](#telemetry-attribute-map)
 - [WiFi Local Port Investigation](#wifi-local-port-investigation)
 - [Firmware Update (OTA)](#firmware-update-ota)
@@ -1073,6 +1077,81 @@ async def main():
 
 asyncio.run(main())
 ```
+
+---
+
+## Guardian / D5 V2 BLE Variant (`WP`)
+
+Everything above describes the Mega family, which advertises the BLE name `TT`.
+The Guardian family advertises **`WP`** (Guardian 6000, Guardian 6000 V2 / `D5 V2`,
+HP2500) and keeps the same GATT characteristics, CRC8 and frame envelope but
+differs in two places: the AUTH sequence and the shape of telemetry
+notifications.
+
+### AUTH: config-net-info frame
+
+`SingleBleDevice.getBleToDeviceSendConfigNetInfoCmd1` in the Cleanergy APK builds
+one payload which is then sliced into the usual 20-byte frames
+(`[prefix][pkgSn][17 bytes][CRC8-SMBUS]`, prefix `0x01`, terminator frame on index
+`0x89`).  Payload layout:
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | header, `0x01` |
+| 1 | 1 | length of everything after this byte: **`0xA8`** (168) |
+| 2 | 32 | WiFi SSID — **an empty SSID is padded with `0x01`, not `0x00`/`0x02`** |
+| 34 | 64 | WiFi password, zero padded |
+| 98 | 6 | BSSID, zero padded |
+| 104 | 10 | `device_key` (the same 10-char key the Mega family uses) |
+| 114 | 33 | **`openId`** of the owning cloud account, zero padded |
+| 147 | 4 | `cmd` big-endian (the app passes `16`) |
+| 151 | 4 | `cmd` repeated |
+| 155 | 10 | reserved, zero |
+| 165 | 5 | **`userId`** of the owning cloud account, big-endian |
+
+Two details cost the most time to find, because both fail in a way that looks like
+a radio problem:
+
+- **The pad byte.** An empty SSID field must be `0x01 * 32`. With `0x02 * 32` the
+  station rejects the frame.
+- **The identity.** `openId` / `userId` must belong to the account the station is
+  bound to. Otherwise the reply is `03 80 01 01 01` and the station closes the ACL
+  link roughly four seconds later. SMP pairing is refused outright (`FAILED`), so
+  bonding is not the mechanism — this frame is.
+
+A `TT`-style AUTH frame (key plus a 30-byte random token) is accepted by Mega
+devices and rejected by these.
+
+### Telemetry: packed TLV stream
+
+Query responses and continuous notifications arrive prefixed **`0x03`** (not
+`0x01`) as a single TLV stream packed tightly across the 17-byte payload slices,
+so entries straddle packet boundaries and must be reassembled before parsing:
+
+```
+[0x02][0x05][dpid: uint8][value: uint32 little-endian]     7 bytes per entry
+```
+
+`pkgSn` (byte 1) still orders the packets: low 7 bits index, bit 7 last packet.
+The final packet is zero padded, which is what distinguishes a complete stream
+from a truncated one.  On the first packet byte 2 is the TLV tag `0x02`, **not** a
+Cmd2/Cmd3 echo byte, so it must not be stripped the way settings responses are.
+
+### Attr 23 packs both DC inputs
+
+Attr 23 is one 4-byte value slot holding **two uint16 wattages**, the power of
+each DC input, low half first:
+
+| Raw uint32 LE | Decoded | Attr 21 (total input) |
+|---------------|---------|-----------------------|
+| `0x07d107cf` | 1999 W + 2001 W | 4000 W |
+| `0x07d007ce` | 1998 W + 2000 W | 3998 W |
+| `0x07d20287` | 647 W + 2002 W | 2649 W |
+
+The halves sum to attr 21 in every sample taken, and PV voltage is reported
+separately (around 140 V on a string this size), so these are watts and not 0.1 V
+units.  A plain uint32 decode reads about 131 MW, which is how this shows up in
+the UI.
 
 ---
 

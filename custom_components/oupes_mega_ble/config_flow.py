@@ -47,10 +47,12 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DEVICE_KEY,
     CONF_NAME,
+    CONF_OPEN_ID,
     CONF_POLL_INTERVAL,
     CONF_PRODUCT_ID,
     CONF_RUNTIME_MAX,
     CONF_STALE_TIMEOUT,
+    CONF_USER_ID,
     DOMAIN,
     STALE_TIMEOUT,
     UPDATE_INTERVAL,
@@ -755,14 +757,27 @@ class OUPESMegaOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             raw_key = user_input.get(CONF_DEVICE_KEY, "").strip()
+            raw_open_id = str(user_input.get(CONF_OPEN_ID, "") or "").strip()
+            try:
+                raw_user_id = int(user_input.get(CONF_USER_ID, 0) or 0)
+            except (TypeError, ValueError):
+                raw_user_id = -1
 
             if raw_key and not _valid_device_key(raw_key):
                 errors[CONF_DEVICE_KEY] = "invalid_device_key"
+            # openId is a 33-char field on the wire (32 usable chars + NUL) and the
+            # userId field is 5 bytes big-endian.
+            if raw_open_id and (len(raw_open_id) > 32 or not raw_open_id.isascii()):
+                errors[CONF_OPEN_ID] = "invalid_open_id"
+            if raw_user_id < 0 or raw_user_id > 1099511627775:
+                errors[CONF_USER_ID] = "invalid_user_id"
 
             if not errors:
                 opts = dict(user_input)
                 if raw_key:
                     opts[CONF_DEVICE_KEY] = raw_key
+                opts[CONF_OPEN_ID] = raw_open_id
+                opts[CONF_USER_ID] = raw_user_id
                 return self.async_create_entry(title="", data=opts)
 
         current_key = (
@@ -779,6 +794,16 @@ class OUPESMegaOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_DEVICE_KEY, default=current_key): str,
+                    vol.Optional(
+                        CONF_OPEN_ID,
+                        default=self._entry.options.get(CONF_OPEN_ID, ""),
+                    ): TextSelector(TextSelectorConfig(multiline=False)),
+                    vol.Optional(
+                        CONF_USER_ID,
+                        default=self._entry.options.get(CONF_USER_ID, 0),
+                    ): NumberSelector(NumberSelectorConfig(
+                        min=0, max=1099511627775, step=1, mode=NumberSelectorMode.BOX,
+                    )),
                     vol.Required(
                         CONF_CONTINUOUS,
                         default=self._entry.options.get(CONF_CONTINUOUS, True),
